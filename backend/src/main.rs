@@ -39,7 +39,7 @@ async fn main() -> std::io::Result<()> {
     let jwt_secret = std::env::var("FS_JWT_SECRET")
         .unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
 
-    let db_path = std::env::var("FS_DB_PATH").unwrap_or_else(|_| "data/app.db".to_string());
+    let db_path = std::env::var("FS_DB_PATH").unwrap_or_else(|_| "../data/app.db".to_string());
     let conn = db::init(&db_path);
 
     let state = web::Data::new(AppState {
