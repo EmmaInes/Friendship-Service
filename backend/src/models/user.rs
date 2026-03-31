@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct User {
     pub id: String,
     pub email: String,
