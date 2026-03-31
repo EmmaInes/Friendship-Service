@@ -32,14 +32,15 @@ function renderNav() {
     </div>
   `;
 
-  const logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
-      clearAuth();
-      window.location.hash = '/';
-    });
-  }
 }
+
+// Handle logout via event delegation (survives nav re-renders)
+document.getElementById('nav').addEventListener('click', (e) => {
+  if (e.target.id === 'logout-btn') {
+    clearAuth();
+    window.location.hash = '/login';
+  }
+});
 
 // Re-render nav on every hash change to reflect auth state
 window.addEventListener('hashchange', renderNav);
