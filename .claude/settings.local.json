@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check:*)",
+      "Bash(npm install:*)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$HOME/.nvm/versions/node/v21.6.2/bin:$PATH\")",
+      "Bash(npm --version)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(chmod +x \"/Volumes/Samsung_T5/Friendship&Service/scripts/dev.sh\" \"/Volumes/Samsung_T5/Friendship&Service/scripts/build.sh\")",
+      "Bash(export PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:$PATH\")",
+      "Bash(ls -la \"/Volumes/Samsung_T5/Friendship&Service/.claude\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(echo \"$HOME/.cargo/bin/cargo\")",
+      "Read(//opt/homebrew/Cellar/node/25.2.1/bin/**)",
+      "Read(//opt/homebrew/lib/node_modules/npm/bin/**)",
+      "Bash(ls \"/Volumes/Samsung_T5/Friendship&Service/frontend/node_modules/.bin/vite\")",
+      "Bash(chmod +x \"/Volumes/Samsung_T5/Friendship&Service/scripts/vite-dev.sh\")",
+      "Bash(realpath \"/Volumes/Samsung_T5/Friendship&Service/frontend/node_modules/vite/bin/vite.js\")",
+      "Bash(ls \"/Volumes/Samsung_T5/Friendship&Service/frontend/node_modules/vite/bin/vite.js\")"
+    ]
+  }
+}

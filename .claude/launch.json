@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Vite)",
+      "runtimeExecutable": "/opt/homebrew/bin/node",
+      "runtimeArgs": ["/Volumes/Samsung_T5/Friendship&Service/frontend/node_modules/vite/bin/vite.js", "--config", "/Volumes/Samsung_T5/Friendship&Service/frontend/vite.config.js"],
+      "port": 5173
+    },
+    {
+      "name": "Backend (Actix Web)",
+      "runtimeExecutable": "/Users/emmawahnish/.cargo/bin/cargo",
+      "runtimeArgs": ["run"],
+      "port": 8080
+    }
+  ]
+}
