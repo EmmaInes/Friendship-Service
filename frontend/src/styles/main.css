@@ -180,6 +180,12 @@ body {
   min-height: 1.2em;
 }
 
+.success-msg {
+  color: var(--color-secondary);
+  font-size: 0.85rem;
+  min-height: 1.2em;
+}
+
 /* Services list */
 .services-grid {
   display: grid;

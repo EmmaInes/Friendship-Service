@@ -44,6 +44,7 @@ export const api = {
   register: (data) => request('POST', '/auth/register', data),
   login: (data) => request('POST', '/auth/login', data),
   me: () => request('GET', '/auth/me'),
+  resetPassword: (data) => request('POST', '/auth/reset-password', data),
   getServices: () => request('GET', '/services'),
   createService: (data) => request('POST', '/services', data),
   getService: (id) => request('GET', `/services/${id}`),

@@ -18,6 +18,7 @@ export default function login(app) {
         <p class="error-msg" id="login-error"></p>
         <button type="submit" class="btn btn-primary">Log In</button>
       </form>
+      <p class="auth-switch"><a href="#/forgot-password">Forgot password?</a></p>
       <p class="auth-switch">Don't have an account? <a href="#/register">Sign up</a></p>
     </section>
   `;
