@@ -5,6 +5,7 @@ export default function home(app) {
 
   app.innerHTML = `
     <section class="hero">
+      <img src="/logo.svg" alt="Friendship &amp; Service" class="hero-logo" />
       <h1>Friendship &amp; Service</h1>
       <p>A community marketplace where neighbors help neighbors.</p>
       ${isLoggedIn() ? `

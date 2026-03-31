@@ -93,6 +93,13 @@ body {
   padding: var(--space-2xl) 0;
 }
 
+.hero-logo {
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto var(--space-lg);
+}
+
 .hero h1 {
   font-size: 2.5rem;
   font-weight: 700;
