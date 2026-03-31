@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- Badge circle -->
+  <circle cx="60" cy="60" r="56" fill="#2563eb" />
+  <circle cx="60" cy="60" r="50" fill="none" stroke="#fff" stroke-width="2.5" />
+
+  <!-- Left hand (lighter skin) -->
+  <g transform="translate(60,62)">
+    <!-- Left forearm -->
+    <path d="M-8,8 L-30,20 Q-34,22 -36,18 L-36,14 Q-34,10 -30,12 L-12,2" fill="#f0c5a0" stroke="#d4a373" stroke-width="1"/>
+    <!-- Left fingers wrapping -->
+    <path d="M-10,2 Q-14,-2 -12,-6 Q-10,-9 -6,-7" fill="#f0c5a0" stroke="#d4a373" stroke-width="0.8"/>
+    <path d="M-12,-2 Q-16,-5 -14,-10 Q-12,-13 -8,-10" fill="#f0c5a0" stroke="#d4a373" stroke-width="0.8"/>
+    <!-- Left thumb -->
+    <path d="M-6,6 Q-4,10 -8,12 Q-10,12 -10,10 L-8,6" fill="#f0c5a0" stroke="#d4a373" stroke-width="0.8"/>
+  </g>
+
+  <!-- Right hand (darker skin) -->
+  <g transform="translate(60,62)">
+    <!-- Right forearm -->
+    <path d="M8,8 L30,20 Q34,22 36,18 L36,14 Q34,10 30,12 L12,2" fill="#8d5e3c" stroke="#6b4226" stroke-width="1"/>
+    <!-- Right fingers wrapping -->
+    <path d="M10,2 Q14,-2 12,-6 Q10,-9 6,-7" fill="#8d5e3c" stroke="#6b4226" stroke-width="0.8"/>
+    <path d="M12,-2 Q16,-5 14,-10 Q12,-13 8,-10" fill="#8d5e3c" stroke="#6b4226" stroke-width="0.8"/>
+    <!-- Right thumb -->
+    <path d="M6,6 Q4,10 8,12 Q10,12 10,10 L8,6" fill="#8d5e3c" stroke="#6b4226" stroke-width="0.8"/>
+  </g>
+
+  <!-- Clasped center (interlocking fingers) -->
+  <g transform="translate(60,62)">
+    <ellipse cx="0" cy="-4" rx="7" ry="9" fill="#c4956a" stroke="#a07850" stroke-width="0.8"/>
+    <!-- Finger lines -->
+    <line x1="-3" y1="-10" x2="-3" y2="-1" stroke="#a07850" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="0" y1="-11" x2="0" y2="-1" stroke="#a07850" stroke-width="0.7" stroke-linecap="round"/>
+    <line x1="3" y1="-10" x2="3" y2="-1" stroke="#a07850" stroke-width="0.7" stroke-linecap="round"/>
+  </g>
+
+  <!-- Badge text arc - top -->
+  <path id="topArc" d="M20,60 A40,40 0 0,1 100,60" fill="none"/>
+  <text font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#fff" letter-spacing="2">
+    <textPath href="#topArc" startOffset="50%" text-anchor="middle">FRIENDSHIP</textPath>
+  </text>
+
+  <!-- Badge text arc - bottom -->
+  <path id="bottomArc" d="M22,68 A40,40 0 0,0 98,68" fill="none"/>
+  <text font-family="system-ui, sans-serif" font-size="8.5" font-weight="700" fill="#fff" letter-spacing="2">
+    <textPath href="#bottomArc" startOffset="50%" text-anchor="middle">SERVICE</textPath>
+  </text>
+
+  <!-- Small decorative stars -->
+  <circle cx="22" cy="62" r="2" fill="#fff"/>
+  <circle cx="98" cy="62" r="2" fill="#fff"/>
+</svg>

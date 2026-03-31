@@ -119,6 +119,13 @@ body {
   margin: var(--space-2xl) auto;
 }
 
+.auth-logo {
+  display: block;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto var(--space-lg);
+}
+
 .auth-page h2 {
   text-align: center;
   margin-bottom: var(--space-lg);

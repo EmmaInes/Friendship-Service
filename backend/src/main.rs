@@ -60,6 +60,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/auth/register", web::post().to(handlers::auth::register))
             .route("/api/auth/login", web::post().to(handlers::auth::login))
             .route("/api/auth/me", web::get().to(handlers::auth::me))
+            .route("/api/auth/reset-password", web::post().to(handlers::auth::reset_password))
             // Services
             .route("/api/services", web::get().to(handlers::services::list))
             .route("/api/services", web::post().to(handlers::services::create))

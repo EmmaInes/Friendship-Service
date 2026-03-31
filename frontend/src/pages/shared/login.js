@@ -4,6 +4,7 @@ import { navigate } from '../../router.js';
 export default function login(app) {
   app.innerHTML = `
     <section class="auth-page">
+      <img src="/logo.svg" alt="Friendship &amp; Service" class="auth-logo" />
       <h2>Log In</h2>
       <form id="login-form" class="auth-form">
         <label>

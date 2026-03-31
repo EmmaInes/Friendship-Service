@@ -129,6 +129,63 @@ pub async fn login(
     }
 }
 
+#[derive(Debug, Deserialize, Validate)]
+pub struct ResetPasswordRequest {
+    #[validate(email)]
+    pub email: String,
+    #[validate(length(min = 3, max = 30))]
+    pub username: String,
+    #[validate(length(min = 8))]
+    pub new_password: String,
+}
+
+pub async fn reset_password(
+    state: web::Data<AppState>,
+    body: web::Json<ResetPasswordRequest>,
+) -> HttpResponse {
+    if let Err(errors) = body.validate() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Validation failed",
+            "details": errors.to_string()
+        }));
+    }
+
+    let db = state.db.lock().unwrap();
+
+    // Verify identity: email + username must match
+    let user_id = db.query_row(
+        "SELECT id FROM users WHERE email = ?1 AND username = ?2",
+        rusqlite::params![body.email, body.username],
+        |row| row.get::<_, String>(0),
+    );
+
+    match user_id {
+        Ok(id) => {
+            let password_hash = match auth::hash_password(&body.new_password) {
+                Ok(h) => h,
+                Err(_) => {
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to hash password"
+                    }))
+                }
+            };
+
+            db.execute(
+                "UPDATE users SET password_hash = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?2",
+                rusqlite::params![password_hash, id],
+            )
+            .unwrap();
+
+            HttpResponse::Ok().json(serde_json::json!({
+                "message": "Password updated successfully"
+            }))
+        }
+        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "No account found with that email and username combination"
+        })),
+    }
+}
+
 pub async fn me(req: HttpRequest, state: web::Data<AppState>) -> HttpResponse {
     let token = match req
         .headers()
