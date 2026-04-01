@@ -30,6 +30,11 @@ function renderActions(r) {
     parts.push(`<button class="btn btn-small btn-advance" data-request-id="${r.id}" data-next="${WORK_STATUS_NEXT[r.work_status]}">${t(nextKey)}</button>`);
   }
 
+  // Chat button (when accepted/pending)
+  if (r.status === 'accepted' || r.status === 'pending') {
+    parts.push(`<a href="#/chat/${r.id}" class="btn btn-small btn-chat">${t('dashboard.btnChat')}</a>`);
+  }
+
   // Review button (both, when ongoing/done and hasn't reviewed)
   if ((r.work_status === 'ongoing' || r.work_status === 'done') && !r.has_reviewed) {
     parts.push(`<button class="btn btn-small btn-review" data-request-id="${r.id}">${t('dashboard.btnReview')}</button>`);

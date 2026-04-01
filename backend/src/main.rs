@@ -75,6 +75,10 @@ async fn main() -> std::io::Result<()> {
             .route("/api/requests/{id}/review", web::post().to(handlers::reviews::submit))
             .route("/api/requests/{id}/reviews", web::get().to(handlers::reviews::for_request))
             .route("/api/users/{id}/ratings", web::get().to(handlers::reviews::user_ratings))
+            // Messages
+            .route("/api/requests/{id}/messages", web::get().to(handlers::messages::get_messages))
+            .route("/api/requests/{id}/messages", web::post().to(handlers::messages::send_message))
+            .route("/api/messages/unread-count", web::get().to(handlers::messages::unread_count))
             // Surveys & Suggestions
             .route("/api/surveys", web::post().to(handlers::surveys::upsert))
             .route("/api/surveys/mine", web::get().to(handlers::surveys::get_mine))

@@ -1,5 +1,5 @@
 import { route, start } from './router.js';
-import { isLoggedIn, getUser, clearAuth } from './api.js';
+import { isLoggedIn, getUser, clearAuth, api } from './api.js';
 import { initI18n, t, getLocale, setLocale, getSupportedLocales } from './i18n/i18n.js';
 import home from './pages/shared/home.js';
 import login from './pages/shared/login.js';
@@ -13,6 +13,7 @@ import dashboard from './pages/shared/dashboard.js';
 import providerSurvey from './pages/provider/provider-survey.js';
 import seekerSurvey from './pages/seeker/seeker-survey.js';
 import suggestions from './pages/seeker/suggestions.js';
+import chat from './pages/shared/chat.js';
 
 const FLAGS = { en: '\u{1F1FA}\u{1F1F8}', es: '\u{1F1E6}\u{1F1F7}', pt: '\u{1F1E7}\u{1F1F7}' };
 
@@ -31,7 +32,7 @@ function renderNav() {
           <a href="#/services/new">${t('nav.offer')}</a>
           <a href="#/survey/seeker">${t('nav.seekerSurvey')}</a>
           <a href="#/survey/provider">${t('nav.providerSurvey')}</a>
-          <a href="#/dashboard">${t('nav.dashboard')}</a>
+          <a href="#/dashboard" id="nav-dashboard">${t('nav.dashboard')}<span id="unread-badge" class="nav-badge" style="display:none"></span></a>
           <span class="nav-user">${user?.display_name || 'Account'}</span>
           <button id="logout-btn" class="btn btn-small">${t('nav.logOut')}</button>
         ` : `
@@ -77,7 +78,38 @@ route('/dashboard', dashboard);
 route('/survey/provider', providerSurvey);
 route('/survey/seeker', seekerSurvey);
 route('/suggestions', suggestions);
+route('/chat/:id', chat);
 route('/404', notFound);
+
+// Unread message badge polling
+let unreadInterval = null;
+
+async function pollUnread() {
+  if (!isLoggedIn()) return;
+  try {
+    const data = await api.getUnreadCount();
+    const badge = document.getElementById('unread-badge');
+    if (badge) {
+      if (data.count > 0) {
+        badge.textContent = data.count;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch { /* silent */ }
+}
+
+function startUnreadPolling() {
+  if (unreadInterval) clearInterval(unreadInterval);
+  if (isLoggedIn()) {
+    pollUnread();
+    unreadInterval = setInterval(pollUnread, 30000);
+  }
+}
+
+// Re-check polling on nav changes (login/logout)
+window.addEventListener('hashchange', startUnreadPolling);
 
 // Async boot — load translations before first render
 async function boot() {
@@ -85,5 +117,6 @@ async function boot() {
   const app = document.getElementById('app');
   renderNav();
   start(app);
+  startUnreadPolling();
 }
 boot();

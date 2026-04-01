@@ -227,6 +227,17 @@
   "rating.asProvider": "Como proveedor",
   "rating.asSeeker": "Como buscador",
 
+  "chat.title": "Chat",
+  "chat.placeholder": "Escribí un mensaje...",
+  "chat.send": "Enviar",
+  "chat.empty": "No hay mensajes aún. ¡Iniciá la conversación!",
+  "chat.loadFailed": "Error al cargar mensajes",
+  "chat.sendFailed": "Error al enviar mensaje",
+  "chat.with": "Chat con {name}",
+  "chat.about": "Sobre: {serviceTitle}",
+
+  "dashboard.btnChat": "Chat",
+
   "lang.en": "English",
   "lang.es": "Español",
   "lang.pt": "Português"
