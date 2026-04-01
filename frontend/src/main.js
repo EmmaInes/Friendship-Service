@@ -9,6 +9,9 @@ import browse from './pages/seeker/browse.js';
 import serviceDetail from './pages/seeker/service-detail.js';
 import createService from './pages/provider/create-service.js';
 import dashboard from './pages/shared/dashboard.js';
+import providerSurvey from './pages/provider/provider-survey.js';
+import seekerSurvey from './pages/seeker/seeker-survey.js';
+import suggestions from './pages/seeker/suggestions.js';
 
 function renderNav() {
   const nav = document.getElementById('nav');
@@ -20,7 +23,10 @@ function renderNav() {
       <div class="nav-links">
         ${isLoggedIn() ? `
           <a href="#/services">Browse</a>
+          <a href="#/suggestions">For You</a>
           <a href="#/services/new">Offer</a>
+          <a href="#/survey/seeker">Seeker Survey</a>
+          <a href="#/survey/provider">Provider Survey</a>
           <a href="#/dashboard">Dashboard</a>
           <span class="nav-user">${user?.display_name || 'Account'}</span>
           <button id="logout-btn" class="btn btn-small">Log Out</button>
@@ -54,6 +60,9 @@ route('/services', browse);
 route('/services/new', createService);
 route('/services/:id', serviceDetail);
 route('/dashboard', dashboard);
+route('/survey/provider', providerSurvey);
+route('/survey/seeker', seekerSurvey);
+route('/suggestions', suggestions);
 route('/404', notFound);
 
 // Boot

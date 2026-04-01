@@ -70,6 +70,10 @@ async fn main() -> std::io::Result<()> {
             // Requests
             .route("/api/requests/mine", web::get().to(handlers::services::my_requests))
             .route("/api/requests/{id}", web::patch().to(handlers::services::update_request_status))
+            // Surveys & Suggestions
+            .route("/api/surveys", web::post().to(handlers::surveys::upsert))
+            .route("/api/surveys/mine", web::get().to(handlers::surveys::get_mine))
+            .route("/api/suggestions", web::get().to(handlers::surveys::suggestions))
     })
     .bind((host.as_str(), port))?
     .run()

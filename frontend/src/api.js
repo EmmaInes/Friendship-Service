@@ -52,4 +52,7 @@ export const api = {
   getMyServices: () => request('GET', '/services/mine'),
   getMyRequests: () => request('GET', '/requests/mine'),
   updateRequestStatus: (id, status) => request('PATCH', `/requests/${id}`, { status }),
+  saveSurvey: (data) => request('POST', '/surveys', data),
+  getMySurveys: () => request('GET', '/surveys/mine'),
+  getSuggestions: () => request('GET', '/suggestions'),
 };
