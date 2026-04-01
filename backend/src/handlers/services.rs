@@ -44,7 +44,9 @@ pub async fn list(state: web::Data<AppState>) -> HttpResponse {
         .prepare(
             "SELECT s.id, s.provider_id, s.title, s.description, s.category,
                     s.price_cents, s.price_type, s.location, s.created_at,
-                    u.display_name, u.username
+                    u.display_name, u.username,
+                    COALESCE((SELECT AVG(rv.rating) FROM reviews rv WHERE rv.reviewee_id = s.provider_id AND rv.reviewer_role = 'seeker'), 0) as avg_rating,
+                    (SELECT COUNT(*) FROM reviews rv WHERE rv.reviewee_id = s.provider_id AND rv.reviewer_role = 'seeker') as review_count
              FROM services s
              JOIN users u ON u.id = s.provider_id
              WHERE s.is_active = 1
@@ -54,6 +56,7 @@ pub async fn list(state: web::Data<AppState>) -> HttpResponse {
 
     let services: Vec<serde_json::Value> = stmt
         .query_map([], |row| {
+            let avg: f64 = row.get(11)?;
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "provider_id": row.get::<_, String>(1)?,
@@ -66,6 +69,8 @@ pub async fn list(state: web::Data<AppState>) -> HttpResponse {
                 "created_at": row.get::<_, String>(8)?,
                 "provider_name": row.get::<_, String>(9)?,
                 "provider_username": row.get::<_, String>(10)?,
+                "avg_rating": (avg * 10.0).round() / 10.0,
+                "review_count": row.get::<_, i64>(12)?,
             }))
         })
         .unwrap()
@@ -123,12 +128,15 @@ pub async fn get(state: web::Data<AppState>, path: web::Path<String>) -> HttpRes
     let result = db.query_row(
         "SELECT s.id, s.provider_id, s.title, s.description, s.category,
                 s.price_cents, s.price_type, s.location, s.is_active, s.created_at,
-                u.display_name, u.username
+                u.display_name, u.username,
+                COALESCE((SELECT AVG(rv.rating) FROM reviews rv WHERE rv.reviewee_id = s.provider_id AND rv.reviewer_role = 'seeker'), 0),
+                (SELECT COUNT(*) FROM reviews rv WHERE rv.reviewee_id = s.provider_id AND rv.reviewer_role = 'seeker')
          FROM services s
          JOIN users u ON u.id = s.provider_id
          WHERE s.id = ?1",
         rusqlite::params![id],
         |row| {
+            let avg: f64 = row.get(12)?;
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "provider_id": row.get::<_, String>(1)?,
@@ -142,6 +150,8 @@ pub async fn get(state: web::Data<AppState>, path: web::Path<String>) -> HttpRes
                 "created_at": row.get::<_, String>(9)?,
                 "provider_name": row.get::<_, String>(10)?,
                 "provider_username": row.get::<_, String>(11)?,
+                "avg_rating": (avg * 10.0).round() / 10.0,
+                "review_count": row.get::<_, i64>(13)?,
             }))
         },
     );
@@ -263,10 +273,16 @@ pub async fn my_requests(req: HttpRequest, state: web::Data<AppState>) -> HttpRe
 
     let mut stmt = db
         .prepare(
-            "SELECT r.id, r.service_id, r.message, r.status, r.created_at,
-                    s.title as service_title
+            "SELECT r.id, r.service_id, r.message, r.status, r.work_status, r.created_at,
+                    s.title as service_title, s.provider_id,
+                    r.seeker_id,
+                    provider_u.display_name as provider_name,
+                    seeker_u.display_name as seeker_name,
+                    (SELECT COUNT(*) FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_id = ?1) as my_review_count
              FROM service_requests r
              JOIN services s ON s.id = r.service_id
+             JOIN users provider_u ON provider_u.id = s.provider_id
+             JOIN users seeker_u ON seeker_u.id = r.seeker_id
              WHERE r.seeker_id = ?1 OR s.provider_id = ?1
              ORDER BY r.created_at DESC",
         )
@@ -274,13 +290,23 @@ pub async fn my_requests(req: HttpRequest, state: web::Data<AppState>) -> HttpRe
 
     let requests: Vec<serde_json::Value> = stmt
         .query_map(rusqlite::params![user_id], |row| {
+            let provider_id: String = row.get(7)?;
+            let seeker_id: String = row.get(8)?;
+            let is_provider = user_id == provider_id;
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "service_id": row.get::<_, String>(1)?,
                 "message": row.get::<_, String>(2)?,
                 "status": row.get::<_, String>(3)?,
-                "created_at": row.get::<_, String>(4)?,
-                "service_title": row.get::<_, String>(5)?,
+                "work_status": row.get::<_, String>(4)?,
+                "created_at": row.get::<_, String>(5)?,
+                "service_title": row.get::<_, String>(6)?,
+                "provider_id": provider_id,
+                "seeker_id": seeker_id,
+                "provider_name": row.get::<_, String>(9)?,
+                "seeker_name": row.get::<_, String>(10)?,
+                "has_reviewed": row.get::<_, i64>(11)? > 0,
+                "my_role": if is_provider { "provider" } else { "seeker" },
             }))
         })
         .unwrap()
@@ -288,6 +314,75 @@ pub async fn my_requests(req: HttpRequest, state: web::Data<AppState>) -> HttpRe
         .collect();
 
     HttpResponse::Ok().json(requests)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateWorkStatusBody {
+    pub work_status: String,
+}
+
+pub async fn update_work_status(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    path: web::Path<String>,
+    body: web::Json<UpdateWorkStatusBody>,
+) -> HttpResponse {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    let request_id = path.into_inner();
+    let valid_transitions = [
+        ("not_started", "in_progress"),
+        ("in_progress", "ongoing"),
+        ("ongoing", "done"),
+    ];
+
+    let db = state.db.lock().unwrap();
+
+    // Verify provider and get current state
+    let current = db.query_row(
+        "SELECT r.status, r.work_status, s.provider_id
+         FROM service_requests r
+         JOIN services s ON s.id = r.service_id
+         WHERE r.id = ?1",
+        rusqlite::params![request_id],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+    );
+
+    match current {
+        Ok((status, current_ws, provider_id)) => {
+            if provider_id != user_id {
+                return HttpResponse::Forbidden()
+                    .json(serde_json::json!({"error": "Only the provider can update work status"}));
+            }
+            if status != "accepted" {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({"error": "Request must be accepted to update work status"}));
+            }
+
+            let is_valid = valid_transitions
+                .iter()
+                .any(|(from, to)| *from == current_ws && *to == body.work_status);
+
+            if !is_valid {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "error": format!("Cannot transition from '{}' to '{}'", current_ws, body.work_status)
+                }));
+            }
+
+            db.execute(
+                "UPDATE service_requests SET work_status = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?2",
+                rusqlite::params![body.work_status, request_id],
+            )
+            .unwrap();
+
+            HttpResponse::Ok().json(serde_json::json!({"message": "Work status updated"}))
+        }
+        Err(_) => HttpResponse::NotFound()
+            .json(serde_json::json!({"error": "Request not found"})),
+    }
 }
 
 #[derive(Debug, Deserialize)]

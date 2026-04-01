@@ -2,6 +2,7 @@ import { api, isLoggedIn, getUser } from '../../api.js';
 import { navigate } from '../../router.js';
 import { t, translateError } from '../../i18n/i18n.js';
 import { formatPrice } from '../../utils.js';
+import { renderStars } from '../../components/star-rating.js';
 
 export default async function serviceDetail(app, id) {
   app.innerHTML = `<p>${t('common.loading')}</p>`;
