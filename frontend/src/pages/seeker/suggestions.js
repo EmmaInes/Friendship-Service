@@ -2,6 +2,7 @@ import { api, isLoggedIn } from '../../api.js';
 import { navigate } from '../../router.js';
 import { t } from '../../i18n/i18n.js';
 import { formatPrice } from '../../utils.js';
+import { renderStars } from '../../components/star-rating.js';
 
 export default async function suggestions(app) {
   if (!isLoggedIn()) { navigate('/login'); return; }
@@ -50,6 +51,7 @@ export default async function suggestions(app) {
               <p>${s.description.length > 120 ? s.description.slice(0, 120) + '...' : s.description}</p>
               <p class="price">${formatPrice(s.price_cents, s.price_type)}</p>
               <p style="font-size:0.8rem;color:var(--color-text-muted)">${t('browse.by', { name: s.provider_name })}</p>
+              <p style="font-size:0.85rem">${renderStars(s.avg_rating, s.review_count)}</p>
               <ul class="suggestion-reasons">
                 ${reasons.map(r => `<li>${r}</li>`).join('')}
               </ul>

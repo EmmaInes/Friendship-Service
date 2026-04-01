@@ -18,6 +18,7 @@ export default async function serviceDetail(app, id) {
         <span class="category" style="margin-top:var(--space-md);display:inline-block">${t('category.' + s.category)}</span>
         <h2 style="margin:var(--space-sm) 0">${s.title}</h2>
         <p style="color:var(--color-text-muted);font-size:0.9rem">${t('detail.offeredBy', { name: s.provider_name, username: s.provider_username })}</p>
+        <p style="margin-top:var(--space-xs)">${renderStars(s.avg_rating, s.review_count)}</p>
         <p style="margin:var(--space-md) 0">${s.description}</p>
         <p class="price" style="font-size:1.2rem">${formatPrice(s.price_cents, s.price_type)}</p>
         ${s.location ? `<p style="font-size:0.9rem;color:var(--color-text-muted)">${t('detail.location', { location: s.location })}</p>` : ''}
