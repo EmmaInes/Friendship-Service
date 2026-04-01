@@ -1,18 +1,15 @@
 import { api, isLoggedIn } from '../../api.js';
 import { navigate } from '../../router.js';
+import { t } from '../../i18n/i18n.js';
+import { CATEGORIES } from '../../utils.js';
 
-const CATEGORIES = [
-  'Tutoring', 'Home Repair', 'Gardening', 'Pet Care', 'Cleaning',
-  'Transportation', 'Technology', 'Cooking', 'Childcare', 'Other'
-];
-
-const AVAILABILITY = ['Weekdays', 'Weekends', 'Evenings', 'Flexible'];
-const EXPERIENCE = ['Beginner', 'Intermediate', 'Expert'];
+const AVAILABILITY_KEYS = ['weekdays', 'weekends', 'evenings', 'flexible'];
+const EXPERIENCE_KEYS = ['beginner', 'intermediate', 'expert'];
 
 export default async function providerSurvey(app) {
   if (!isLoggedIn()) { navigate('/login'); return; }
 
-  app.innerHTML = '<p>Loading...</p>';
+  app.innerHTML = `<p>${t('common.loading')}</p>`;
 
   let existing = null;
   try {
@@ -24,48 +21,48 @@ export default async function providerSurvey(app) {
 
   app.innerHTML = `
     <section class="survey-page">
-      <h2>Provider Survey</h2>
-      <p class="survey-intro">Tell us about the services you can offer so we can connect you with people who need help.</p>
+      <h2>${t('providerSurvey.title')}</h2>
+      <p class="survey-intro">${t('providerSurvey.intro')}</p>
       <form id="provider-survey-form" class="service-form">
         <fieldset>
-          <legend>What categories can you help with?</legend>
+          <legend>${t('providerSurvey.categoriesLegend')}</legend>
           <div class="checkbox-grid">
             ${CATEGORIES.map(c => `
               <label class="checkbox-label">
                 <input type="checkbox" name="categories" value="${c}" ${selectedCats.includes(c) ? 'checked' : ''} />
-                ${c}
+                ${t('category.' + c)}
               </label>
             `).join('')}
           </div>
         </fieldset>
 
         <label>
-          Experience Level
+          ${t('providerSurvey.experience')}
           <select name="experience_level">
-            ${EXPERIENCE.map(e => `<option value="${e.toLowerCase()}" ${existing?.experience_level === e.toLowerCase() ? 'selected' : ''}>${e}</option>`).join('')}
+            ${EXPERIENCE_KEYS.map(e => `<option value="${e}" ${existing?.experience_level === e ? 'selected' : ''}>${t('experience.' + e)}</option>`).join('')}
           </select>
         </label>
 
         <label>
-          Availability
+          ${t('providerSurvey.availability')}
           <select name="availability">
-            ${AVAILABILITY.map(a => `<option value="${a.toLowerCase()}" ${existing?.availability === a.toLowerCase() ? 'selected' : ''}>${a}</option>`).join('')}
+            ${AVAILABILITY_KEYS.map(a => `<option value="${a}" ${existing?.availability === a ? 'selected' : ''}>${t('availability.' + a)}</option>`).join('')}
           </select>
         </label>
 
         <label>
-          Preferred Location / Area
-          <input type="text" name="location_preference" placeholder="e.g. Downtown, Online, Citywide" value="${existing?.location_preference || ''}" />
+          ${t('providerSurvey.location')}
+          <input type="text" name="location_preference" placeholder="${t('providerSurvey.locationPlaceholder')}" value="${existing?.location_preference || ''}" />
         </label>
 
         <label>
-          Tell us more about your skills and experience
-          <textarea name="description" rows="4" placeholder="What makes you great at these services?">${existing?.description || ''}</textarea>
+          ${t('providerSurvey.skills')}
+          <textarea name="description" rows="4" placeholder="${t('providerSurvey.skillsPlaceholder')}">${existing?.description || ''}</textarea>
         </label>
 
         <p class="error-msg" id="survey-error"></p>
         <p class="success-msg" id="survey-success"></p>
-        <button type="submit" class="btn btn-primary">${existing ? 'Update Survey' : 'Submit Survey'}</button>
+        <button type="submit" class="btn btn-primary">${existing ? t('providerSurvey.update') : t('providerSurvey.submit')}</button>
       </form>
     </section>
   `;
@@ -80,7 +77,7 @@ export default async function providerSurvey(app) {
 
     const checked = [...form.querySelectorAll('input[name="categories"]:checked')].map(el => el.value);
     if (checked.length === 0) {
-      errorEl.textContent = 'Please select at least one category';
+      errorEl.textContent = t('providerSurvey.selectOne');
       return;
     }
 
@@ -93,9 +90,9 @@ export default async function providerSurvey(app) {
         experience_level: form.experience_level.value,
         description: form.description.value || undefined,
       });
-      successEl.textContent = 'Survey saved!';
+      successEl.textContent = t('providerSurvey.saved');
     } catch (err) {
-      errorEl.textContent = err.error || 'Failed to save survey';
+      errorEl.textContent = err.error || t('providerSurvey.failed');
     }
   });
 }

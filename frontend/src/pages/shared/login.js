@@ -1,25 +1,26 @@
 import { api, setAuth } from '../../api.js';
 import { navigate } from '../../router.js';
+import { t, translateError } from '../../i18n/i18n.js';
 
 export default function login(app) {
   app.innerHTML = `
     <section class="auth-page">
       <img src="/logo.svg" alt="Friendship &amp; Service" class="auth-logo" />
-      <h2>Log In</h2>
+      <h2>${t('login.title')}</h2>
       <form id="login-form" class="auth-form">
         <label>
-          Email
+          ${t('login.email')}
           <input type="email" name="email" required autocomplete="email" />
         </label>
         <label>
-          Password
+          ${t('login.password')}
           <input type="password" name="password" required autocomplete="current-password" />
         </label>
         <p class="error-msg" id="login-error"></p>
-        <button type="submit" class="btn btn-primary">Log In</button>
+        <button type="submit" class="btn btn-primary">${t('login.submit')}</button>
       </form>
-      <p class="auth-switch"><a href="#/forgot-password">Forgot password?</a></p>
-      <p class="auth-switch">Don't have an account? <a href="#/register">Sign up</a></p>
+      <p class="auth-switch"><a href="#/forgot-password">${t('login.forgotPassword')}</a></p>
+      <p class="auth-switch">${t('login.noAccount')} <a href="#/register">${t('login.signUpLink')}</a></p>
     </section>
   `;
 
@@ -37,7 +38,7 @@ export default function login(app) {
       setAuth(res.token, res.user);
       navigate('/');
     } catch (err) {
-      errorEl.textContent = err.error || 'Login failed';
+      errorEl.textContent = translateError(err.error, 'login.failed');
     }
   });
 }

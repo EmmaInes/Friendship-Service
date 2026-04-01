@@ -1,31 +1,33 @@
 import { api, setAuth } from '../../api.js';
 import { navigate } from '../../router.js';
+import { t, translateError } from '../../i18n/i18n.js';
 
 export default function register(app) {
   app.innerHTML = `
     <section class="auth-page">
-      <h2>Create Account</h2>
+      <img src="/logo.svg" alt="Friendship &amp; Service" class="auth-logo" />
+      <h2>${t('register.title')}</h2>
       <form id="register-form" class="auth-form">
         <label>
-          Display Name
+          ${t('register.displayName')}
           <input type="text" name="display_name" required minlength="1" maxlength="100" />
         </label>
         <label>
-          Username
+          ${t('register.username')}
           <input type="text" name="username" required minlength="3" maxlength="30" autocomplete="username" />
         </label>
         <label>
-          Email
+          ${t('register.email')}
           <input type="email" name="email" required autocomplete="email" />
         </label>
         <label>
-          Password
+          ${t('register.password')}
           <input type="password" name="password" required minlength="8" autocomplete="new-password" />
         </label>
         <p class="error-msg" id="register-error"></p>
-        <button type="submit" class="btn btn-primary">Sign Up</button>
+        <button type="submit" class="btn btn-primary">${t('register.submit')}</button>
       </form>
-      <p class="auth-switch">Already have an account? <a href="#/login">Log in</a></p>
+      <p class="auth-switch">${t('register.hasAccount')} <a href="#/login">${t('register.loginLink')}</a></p>
     </section>
   `;
 
@@ -43,7 +45,7 @@ export default function register(app) {
       setAuth(res.token, res.user);
       navigate('/');
     } catch (err) {
-      errorEl.textContent = err.error || 'Registration failed';
+      errorEl.textContent = translateError(err.error, 'register.failed');
     }
   });
 }

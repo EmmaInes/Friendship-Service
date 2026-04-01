@@ -1,21 +1,7 @@
 import { api, isLoggedIn, getUser } from '../../api.js';
 import { navigate } from '../../router.js';
-
-function formatPrice(cents, type) {
-  if (type === 'free') return 'Free';
-  if (type === 'negotiable') return 'Negotiable';
-  if (cents == null) return type;
-  const dollars = (cents / 100).toFixed(2);
-  return `$${dollars}${type === 'hourly' ? '/hr' : ''}`;
-}
-
-const STATUS_LABELS = {
-  pending: 'Pending',
-  accepted: 'Accepted',
-  declined: 'Declined',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
+import { t } from '../../i18n/i18n.js';
+import { formatPrice } from '../../utils.js';
 
 export default async function dashboard(app) {
   if (!isLoggedIn()) {
@@ -24,7 +10,7 @@ export default async function dashboard(app) {
   }
 
   const user = getUser();
-  app.innerHTML = '<p>Loading dashboard...</p>';
+  app.innerHTML = `<p>${t('dashboard.loading')}</p>`;
 
   try {
     const [services, requests] = await Promise.all([
@@ -34,35 +20,35 @@ export default async function dashboard(app) {
 
     app.innerHTML = `
       <section class="dashboard">
-        <h2>Dashboard</h2>
-        <p style="color:var(--color-text-muted);margin-bottom:var(--space-xl)">Welcome, ${user.display_name}</p>
+        <h2>${t('dashboard.title')}</h2>
+        <p style="color:var(--color-text-muted);margin-bottom:var(--space-xl)">${t('dashboard.welcome', { name: user.display_name })}</p>
 
         <section>
-          <h3>My Services (${services.length})</h3>
+          <h3>${t('dashboard.myServices', { count: services.length })}</h3>
           ${services.length === 0
-            ? '<p class="empty-state">You haven\'t offered any services yet. <a href="#/services/new">Create one</a></p>'
+            ? `<p class="empty-state">${t('dashboard.noServices')} <a href="#/services/new">${t('dashboard.createOne')}</a></p>`
             : `<div class="services-grid">${services.map(s => `
                 <div class="service-card">
-                  <span class="category">${s.category}</span>
+                  <span class="category">${t('category.' + s.category)}</span>
                   <h3>${s.title}</h3>
                   <p class="price">${formatPrice(s.price_cents, s.price_type)}</p>
-                  <p style="font-size:0.8rem;color:var(--color-text-muted)">${s.is_active ? 'Active' : 'Inactive'}</p>
+                  <p style="font-size:0.8rem;color:var(--color-text-muted)">${s.is_active ? t('common.active') : t('common.inactive')}</p>
                 </div>
               `).join('')}</div>`
           }
         </section>
 
         <section>
-          <h3>Requests (${requests.length})</h3>
+          <h3>${t('dashboard.requests', { count: requests.length })}</h3>
           ${requests.length === 0
-            ? '<p class="empty-state">No requests yet.</p>'
+            ? `<p class="empty-state">${t('dashboard.noRequests')}</p>`
             : `<table style="width:100%;border-collapse:collapse;font-size:0.9rem">
                 <thead>
                   <tr style="text-align:left;border-bottom:2px solid var(--color-border)">
-                    <th style="padding:var(--space-sm)">Service</th>
-                    <th style="padding:var(--space-sm)">Message</th>
-                    <th style="padding:var(--space-sm)">Status</th>
-                    <th style="padding:var(--space-sm)">Date</th>
+                    <th style="padding:var(--space-sm)">${t('dashboard.colService')}</th>
+                    <th style="padding:var(--space-sm)">${t('dashboard.colMessage')}</th>
+                    <th style="padding:var(--space-sm)">${t('dashboard.colStatus')}</th>
+                    <th style="padding:var(--space-sm)">${t('dashboard.colDate')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -70,7 +56,7 @@ export default async function dashboard(app) {
                     <tr style="border-bottom:1px solid var(--color-border)">
                       <td style="padding:var(--space-sm)">${r.service_title}</td>
                       <td style="padding:var(--space-sm)">${r.message || '-'}</td>
-                      <td style="padding:var(--space-sm)">${STATUS_LABELS[r.status] || r.status}</td>
+                      <td style="padding:var(--space-sm)">${t('status.' + r.status)}</td>
                       <td style="padding:var(--space-sm)">${new Date(r.created_at).toLocaleDateString()}</td>
                     </tr>
                   `).join('')}
@@ -81,6 +67,6 @@ export default async function dashboard(app) {
       </section>
     `;
   } catch {
-    app.innerHTML = '<p class="error-msg">Failed to load dashboard.</p>';
+    app.innerHTML = `<p class="error-msg">${t('dashboard.loadFailed')}</p>`;
   }
 }

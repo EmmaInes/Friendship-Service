@@ -1,23 +1,15 @@
 import { api, isLoggedIn } from '../../api.js';
 import { navigate } from '../../router.js';
+import { t } from '../../i18n/i18n.js';
+import { CATEGORIES } from '../../utils.js';
 
-const CATEGORIES = [
-  'Tutoring', 'Home Repair', 'Gardening', 'Pet Care', 'Cleaning',
-  'Transportation', 'Technology', 'Cooking', 'Childcare', 'Other'
-];
-
-const AVAILABILITY = ['Weekdays', 'Weekends', 'Evenings', 'Flexible'];
-const URGENCY = [
-  { value: 'urgent', label: 'Urgent (ASAP)' },
-  { value: 'this_week', label: 'This week' },
-  { value: 'this_month', label: 'This month' },
-  { value: 'flexible', label: 'Flexible / No rush' },
-];
+const AVAILABILITY_KEYS = ['weekdays', 'weekends', 'evenings', 'flexible'];
+const URGENCY_KEYS = ['urgent', 'this_week', 'this_month', 'flexible'];
 
 export default async function seekerSurvey(app) {
   if (!isLoggedIn()) { navigate('/login'); return; }
 
-  app.innerHTML = '<p>Loading...</p>';
+  app.innerHTML = `<p>${t('common.loading')}</p>`;
 
   let existing = null;
   try {
@@ -31,62 +23,62 @@ export default async function seekerSurvey(app) {
 
   app.innerHTML = `
     <section class="survey-page">
-      <h2>Seeker Survey</h2>
-      <p class="survey-intro">Tell us what services you're looking for and we'll suggest the best matches.</p>
+      <h2>${t('seekerSurvey.title')}</h2>
+      <p class="survey-intro">${t('seekerSurvey.intro')}</p>
       <form id="seeker-survey-form" class="service-form">
         <fieldset>
-          <legend>What kind of help do you need?</legend>
+          <legend>${t('seekerSurvey.categoriesLegend')}</legend>
           <div class="checkbox-grid">
             ${CATEGORIES.map(c => `
               <label class="checkbox-label">
                 <input type="checkbox" name="categories" value="${c}" ${selectedCats.includes(c) ? 'checked' : ''} />
-                ${c}
+                ${t('category.' + c)}
               </label>
             `).join('')}
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>Budget Range (optional)</legend>
+          <legend>${t('seekerSurvey.budgetLegend')}</legend>
           <div class="inline-fields">
             <label>
-              Min ($)
+              ${t('seekerSurvey.budgetMin')}
               <input type="number" name="budget_min" min="0" step="0.01" placeholder="0.00" value="${budgetMin}" />
             </label>
             <label>
-              Max ($)
+              ${t('seekerSurvey.budgetMax')}
               <input type="number" name="budget_max" min="0" step="0.01" placeholder="100.00" value="${budgetMax}" />
             </label>
           </div>
         </fieldset>
 
         <label>
-          How urgent is your need?
+          ${t('seekerSurvey.urgency')}
           <select name="urgency">
-            ${URGENCY.map(u => `<option value="${u.value}" ${existing?.urgency === u.value ? 'selected' : ''}>${u.label}</option>`).join('')}
+            ${URGENCY_KEYS.map(u => `<option value="${u}" ${existing?.urgency === u ? 'selected' : ''}>${t('urgency.' + u)}</option>`).join('')}
           </select>
         </label>
 
         <label>
-          Preferred Availability
+          ${t('seekerSurvey.availability')}
           <select name="availability">
-            ${AVAILABILITY.map(a => `<option value="${a.toLowerCase()}" ${existing?.availability === a.toLowerCase() ? 'selected' : ''}>${a}</option>`).join('')}
+            ${AVAILABILITY_KEYS.map(a => `<option value="${a}" ${existing?.availability === a ? 'selected' : ''}>${t('availability.' + a)}</option>`).join('')}
           </select>
         </label>
 
         <label>
-          Preferred Location / Area
-          <input type="text" name="location_preference" placeholder="e.g. Downtown, Online" value="${existing?.location_preference || ''}" />
+          ${t('seekerSurvey.location')}
+          <input type="text" name="location_preference" placeholder="${t('seekerSurvey.locationPlaceholder')}" value="${existing?.location_preference || ''}" />
         </label>
 
         <label>
-          Describe what you're looking for
-          <textarea name="description" rows="4" placeholder="Any specific requirements or preferences?">${existing?.description || ''}</textarea>
+          ${t('seekerSurvey.describe')}
+          <textarea name="description" rows="4" placeholder="${t('seekerSurvey.describePlaceholder')}">${existing?.description || ''}</textarea>
         </label>
 
         <p class="error-msg" id="survey-error"></p>
         <p class="success-msg" id="survey-success"></p>
-        <button type="submit" class="btn btn-primary">${existing ? 'Update Survey' : 'Submit Survey'}</button>
+        <button type="submit" class="btn btn-primary">${existing ? t('seekerSurvey.update') : t('seekerSurvey.submit')}</button>
       </form>
     </section>
   `;
@@ -101,7 +93,7 @@ export default async function seekerSurvey(app) {
 
     const checked = [...form.querySelectorAll('input[name="categories"]:checked')].map(el => el.value);
     if (checked.length === 0) {
-      errorEl.textContent = 'Please select at least one category';
+      errorEl.textContent = t('seekerSurvey.selectOne');
       return;
     }
 
@@ -121,9 +113,9 @@ export default async function seekerSurvey(app) {
 
     try {
       await api.saveSurvey(data);
-      successEl.textContent = 'Survey saved! Check your suggestions.';
+      successEl.textContent = t('seekerSurvey.saved');
     } catch (err) {
-      errorEl.textContent = err.error || 'Failed to save survey';
+      errorEl.textContent = err.error || t('seekerSurvey.failed');
     }
   });
 }

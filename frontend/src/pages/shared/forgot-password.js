@@ -1,36 +1,37 @@
 import { api } from '../../api.js';
 import { navigate } from '../../router.js';
+import { t, translateError } from '../../i18n/i18n.js';
 
 export default function forgotPassword(app) {
   app.innerHTML = `
     <section class="auth-page">
       <img src="/logo.svg" alt="Friendship &amp; Service" class="auth-logo" />
-      <h2>Reset Password</h2>
+      <h2>${t('forgot.title')}</h2>
       <p style="text-align:center;color:var(--color-text-muted);margin-bottom:var(--space-lg);font-size:0.9rem">
-        Enter your email and username to verify your identity, then choose a new password.
+        ${t('forgot.instructions')}
       </p>
       <form id="reset-form" class="auth-form">
         <label>
-          Email
+          ${t('forgot.email')}
           <input type="email" name="email" required autocomplete="email" />
         </label>
         <label>
-          Username
+          ${t('forgot.username')}
           <input type="text" name="username" required autocomplete="username" />
         </label>
         <label>
-          New Password
+          ${t('forgot.newPassword')}
           <input type="password" name="new_password" required minlength="8" autocomplete="new-password" />
         </label>
         <label>
-          Confirm New Password
+          ${t('forgot.confirmPassword')}
           <input type="password" name="confirm_password" required minlength="8" autocomplete="new-password" />
         </label>
         <p class="error-msg" id="reset-error"></p>
         <p class="success-msg" id="reset-success"></p>
-        <button type="submit" class="btn btn-primary">Reset Password</button>
+        <button type="submit" class="btn btn-primary">${t('forgot.submit')}</button>
       </form>
-      <p class="auth-switch"><a href="#/login">Back to login</a></p>
+      <p class="auth-switch"><a href="#/login">${t('forgot.backToLogin')}</a></p>
     </section>
   `;
 
@@ -46,7 +47,7 @@ export default function forgotPassword(app) {
     const data = Object.fromEntries(new FormData(form));
 
     if (data.new_password !== data.confirm_password) {
-      errorEl.textContent = 'Passwords do not match';
+      errorEl.textContent = t('forgot.passwordsMismatch');
       return;
     }
 
@@ -56,10 +57,10 @@ export default function forgotPassword(app) {
         username: data.username,
         new_password: data.new_password,
       });
-      successEl.textContent = 'Password updated! Redirecting to login...';
+      successEl.textContent = t('forgot.success');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      errorEl.textContent = err.error || 'Password reset failed';
+      errorEl.textContent = translateError(err.error, 'forgot.failed');
     }
   });
 }

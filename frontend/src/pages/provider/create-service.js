@@ -1,10 +1,9 @@
 import { api, isLoggedIn } from '../../api.js';
 import { navigate } from '../../router.js';
+import { t, translateError } from '../../i18n/i18n.js';
+import { CATEGORIES } from '../../utils.js';
 
-const CATEGORIES = [
-  'Tutoring', 'Home Repair', 'Gardening', 'Pet Care', 'Cleaning',
-  'Transportation', 'Technology', 'Cooking', 'Childcare', 'Other'
-];
+const PRICE_TYPES = ['negotiable', 'free', 'fixed', 'hourly'];
 
 export default function createService(app) {
   if (!isLoggedIn()) {
@@ -14,42 +13,39 @@ export default function createService(app) {
 
   app.innerHTML = `
     <section>
-      <h2>Offer a Service</h2>
+      <h2>${t('createService.title')}</h2>
       <form id="service-form" class="service-form">
         <label>
-          Title
-          <input type="text" name="title" required maxlength="200" placeholder="e.g. Math Tutoring for High School" />
+          ${t('createService.titleLabel')}
+          <input type="text" name="title" required maxlength="200" placeholder="${t('createService.titlePlaceholder')}" />
         </label>
         <label>
-          Category
+          ${t('createService.category')}
           <select name="category" required>
-            <option value="">Select a category</option>
-            ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            <option value="">${t('createService.selectCategory')}</option>
+            ${CATEGORIES.map(c => `<option value="${c}">${t('category.' + c)}</option>`).join('')}
           </select>
         </label>
         <label>
-          Description
-          <textarea name="description" required placeholder="Describe what you offer, your experience, availability..."></textarea>
+          ${t('createService.description')}
+          <textarea name="description" required placeholder="${t('createService.descPlaceholder')}"></textarea>
         </label>
         <label>
-          Pricing
+          ${t('createService.pricing')}
           <select name="price_type">
-            <option value="negotiable">Negotiable</option>
-            <option value="free">Free</option>
-            <option value="fixed">Fixed Price</option>
-            <option value="hourly">Hourly Rate</option>
+            ${PRICE_TYPES.map(pt => `<option value="${pt}">${t('priceType.' + pt)}</option>`).join('')}
           </select>
         </label>
         <label id="price-label" style="display:none">
-          Amount (in dollars)
+          ${t('createService.amount')}
           <input type="number" name="price" min="0" step="0.01" placeholder="0.00" />
         </label>
         <label>
-          Location (optional)
-          <input type="text" name="location" placeholder="e.g. Downtown, Online, etc." />
+          ${t('createService.location')}
+          <input type="text" name="location" placeholder="${t('createService.locationPlaceholder')}" />
         </label>
         <p class="error-msg" id="service-error"></p>
-        <button type="submit" class="btn btn-primary">Create Service</button>
+        <button type="submit" class="btn btn-primary">${t('createService.submit')}</button>
       </form>
     </section>
   `;
@@ -79,7 +75,7 @@ export default function createService(app) {
     if (data.price_type === 'fixed' || data.price_type === 'hourly') {
       const dollars = parseFloat(form.price.value);
       if (isNaN(dollars) || dollars < 0) {
-        errorEl.textContent = 'Please enter a valid price';
+        errorEl.textContent = t('createService.invalidPrice');
         return;
       }
       data.price_cents = Math.round(dollars * 100);
@@ -89,7 +85,7 @@ export default function createService(app) {
       await api.createService(data);
       navigate('/dashboard');
     } catch (err) {
-      errorEl.textContent = err.error || 'Failed to create service';
+      errorEl.textContent = translateError(err.error, 'createService.failed');
     }
   });
 }

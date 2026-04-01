@@ -1,5 +1,6 @@
 import { route, start } from './router.js';
 import { isLoggedIn, getUser, clearAuth } from './api.js';
+import { initI18n, t, getLocale, setLocale, getSupportedLocales } from './i18n/i18n.js';
 import home from './pages/shared/home.js';
 import login from './pages/shared/login.js';
 import register from './pages/shared/register.js';
@@ -13,34 +14,41 @@ import providerSurvey from './pages/provider/provider-survey.js';
 import seekerSurvey from './pages/seeker/seeker-survey.js';
 import suggestions from './pages/seeker/suggestions.js';
 
+const FLAGS = { en: '\u{1F1FA}\u{1F1F8}', es: '\u{1F1E6}\u{1F1F7}', pt: '\u{1F1E7}\u{1F1F7}' };
+
 function renderNav() {
   const nav = document.getElementById('nav');
   const user = getUser();
+  const locale = getLocale();
 
   nav.innerHTML = `
     <div class="nav-inner">
-      <a href="#/" class="nav-brand">Friendship&amp;Service</a>
+      <a href="#/" class="nav-brand"><img src="/logo.svg" alt="Friendship&amp;Service" class="nav-logo" /></a>
       <div class="nav-links">
         ${isLoggedIn() ? `
-          <a href="#/services">Browse</a>
-          <a href="#/suggestions">For You</a>
-          <a href="#/services/new">Offer</a>
-          <a href="#/survey/seeker">Seeker Survey</a>
-          <a href="#/survey/provider">Provider Survey</a>
-          <a href="#/dashboard">Dashboard</a>
+          <a href="#/services">${t('nav.browse')}</a>
+          <a href="#/suggestions">${t('nav.forYou')}</a>
+          <a href="#/services/new">${t('nav.offer')}</a>
+          <a href="#/survey/seeker">${t('nav.seekerSurvey')}</a>
+          <a href="#/survey/provider">${t('nav.providerSurvey')}</a>
+          <a href="#/dashboard">${t('nav.dashboard')}</a>
           <span class="nav-user">${user?.display_name || 'Account'}</span>
-          <button id="logout-btn" class="btn btn-small">Log Out</button>
+          <button id="logout-btn" class="btn btn-small">${t('nav.logOut')}</button>
         ` : `
-          <a href="#/login">Log In</a>
-          <a href="#/register">Sign Up</a>
+          <a href="#/login">${t('nav.logIn')}</a>
+          <a href="#/register">${t('nav.signUp')}</a>
         `}
+        <select id="lang-picker" class="lang-picker">
+          ${getSupportedLocales().map(loc => `
+            <option value="${loc}" ${loc === locale ? 'selected' : ''}>${FLAGS[loc]} ${t('lang.' + loc)}</option>
+          `).join('')}
+        </select>
       </div>
     </div>
   `;
-
 }
 
-// Handle logout via event delegation (survives nav re-renders)
+// Event delegation on nav (logout + language picker)
 document.getElementById('nav').addEventListener('click', (e) => {
   if (e.target.id === 'logout-btn') {
     clearAuth();
@@ -48,7 +56,13 @@ document.getElementById('nav').addEventListener('click', (e) => {
   }
 });
 
-// Re-render nav on every hash change to reflect auth state
+document.getElementById('nav').addEventListener('change', (e) => {
+  if (e.target.id === 'lang-picker') {
+    setLocale(e.target.value);
+  }
+});
+
+// Re-render nav on every hash change to reflect auth state + language
 window.addEventListener('hashchange', renderNav);
 
 // Register routes
@@ -65,7 +79,11 @@ route('/survey/seeker', seekerSurvey);
 route('/suggestions', suggestions);
 route('/404', notFound);
 
-// Boot
-const app = document.getElementById('app');
-renderNav();
-start(app);
+// Async boot — load translations before first render
+async function boot() {
+  await initI18n();
+  const app = document.getElementById('app');
+  renderNav();
+  start(app);
+}
+boot();
