@@ -37,7 +37,6 @@ function renderNav() {
           <button id="logout-btn" class="btn btn-small">${t('nav.logOut')}</button>
         ` : `
           <a href="#/login">${t('nav.logIn')}</a>
-          <a href="#/register">${t('nav.signUp')}</a>
         `}
         <select id="lang-picker" class="lang-picker">
           ${getSupportedLocales().map(loc => `

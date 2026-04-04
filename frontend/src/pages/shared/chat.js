@@ -28,7 +28,12 @@ export default async function chat(app, requestId) {
   app.innerHTML = `
     <div class="chat-page">
       <div class="chat-header">
-        <a href="#/dashboard" class="chat-back">\u2190 ${t('nav.dashboard')}</a>
+        <div class="chat-header-top">
+          <a href="#/dashboard" class="chat-back">\u2190 ${t('nav.dashboard')}</a>
+          ${req.my_role === 'seeker' && req.status === 'accepted' && req.work_status === 'not_started'
+            ? `<button id="chat-accept-offer" class="btn btn-primary btn-small">${t('dashboard.btnAcceptOffer')}</button>`
+            : ''}
+        </div>
         <h3>${t('chat.with', { name: otherName })}</h3>
         <p class="chat-about">${t('chat.about', { serviceTitle: req.service_title })}</p>
       </div>
@@ -77,6 +82,21 @@ export default async function chat(app, requestId) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // Accept Offer button
+  const acceptBtn = document.getElementById('chat-accept-offer');
+  if (acceptBtn) {
+    acceptBtn.addEventListener('click', async () => {
+      acceptBtn.disabled = true;
+      try {
+        await api.updateWorkStatus(requestId, 'in_progress');
+        navigate('/dashboard');
+      } catch (err) {
+        acceptBtn.disabled = false;
+        acceptBtn.textContent = translateError(err.error, 'chat.loadFailed');
+      }
+    });
   }
 
   // Initial load

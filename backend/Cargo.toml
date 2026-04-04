@@ -20,6 +20,9 @@ argon2 = "0.5"
 rand_core = { version = "0.6", features = ["getrandom"] }
 jsonwebtoken = "9"
 
+# HTTP client (Google token verification)
+reqwest = { version = "0.12", features = ["json"] }
+
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }

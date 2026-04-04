@@ -147,6 +147,12 @@ body {
   margin-top: var(--space-lg);
 }
 
+/* Google sign-in button */
+.google-btn-wrap {
+  display: flex;
+  justify-content: center;
+}
+
 /* Auth pages */
 .auth-page {
   max-width: 400px;
@@ -434,6 +440,24 @@ body {
   font-weight: 600;
 }
 
+.btn-decline {
+  background: var(--color-error);
+  color: #fff;
+}
+
+.decline-info {
+  padding: var(--space-sm) var(--space-md);
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.btn-accept-offer {
+  background: var(--color-secondary);
+  color: #fff;
+}
+
 .btn-chat {
   background: var(--color-primary);
   color: #fff;
@@ -452,6 +476,12 @@ body {
 .chat-header {
   padding: var(--space-md);
   border-bottom: 1px solid var(--color-border);
+}
+
+.chat-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .chat-header h3 {

@@ -11,6 +11,8 @@ mod models;
 pub struct AppState {
     pub db: Mutex<Connection>,
     pub jwt_secret: String,
+    pub google_client_id: String,
+    pub http_client: reqwest::Client,
 }
 
 async fn health() -> HttpResponse {
@@ -39,12 +41,17 @@ async fn main() -> std::io::Result<()> {
     let jwt_secret = std::env::var("FS_JWT_SECRET")
         .unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
 
+    let google_client_id = std::env::var("FS_GOOGLE_CLIENT_ID")
+        .unwrap_or_else(|_| "not-configured".to_string());
+
     let db_path = std::env::var("FS_DB_PATH").unwrap_or_else(|_| "../data/app.db".to_string());
     let conn = db::init(&db_path);
 
     let state = web::Data::new(AppState {
         db: Mutex::new(conn),
         jwt_secret,
+        google_client_id,
+        http_client: reqwest::Client::new(),
     });
 
     tracing::info!("Starting Friendship&Service on {}:{}", host, port);
@@ -61,6 +68,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/auth/login", web::post().to(handlers::auth::login))
             .route("/api/auth/me", web::get().to(handlers::auth::me))
             .route("/api/auth/reset-password", web::post().to(handlers::auth::reset_password))
+            .route("/api/auth/google", web::post().to(handlers::auth::google_login))
             // Services
             .route("/api/services", web::get().to(handlers::services::list))
             .route("/api/services", web::post().to(handlers::services::create))

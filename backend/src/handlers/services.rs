@@ -278,7 +278,8 @@ pub async fn my_requests(req: HttpRequest, state: web::Data<AppState>) -> HttpRe
                     r.seeker_id,
                     provider_u.display_name as provider_name,
                     seeker_u.display_name as seeker_name,
-                    (SELECT COUNT(*) FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_id = ?1) as my_review_count
+                    (SELECT COUNT(*) FROM reviews rv WHERE rv.request_id = r.id AND rv.reviewer_id = ?1) as my_review_count,
+                    r.decline_reason, r.declined_by
              FROM service_requests r
              JOIN services s ON s.id = r.service_id
              JOIN users provider_u ON provider_u.id = s.provider_id
@@ -306,6 +307,8 @@ pub async fn my_requests(req: HttpRequest, state: web::Data<AppState>) -> HttpRe
                 "provider_name": row.get::<_, String>(9)?,
                 "seeker_name": row.get::<_, String>(10)?,
                 "has_reviewed": row.get::<_, i64>(11)? > 0,
+                "decline_reason": row.get::<_, String>(12)?,
+                "declined_by": row.get::<_, Option<String>>(13)?,
                 "my_role": if is_provider { "provider" } else { "seeker" },
             }))
         })
@@ -341,30 +344,46 @@ pub async fn update_work_status(
 
     let db = state.db.lock().unwrap();
 
-    // Verify provider and get current state
+    // Verify party and get current state
     let current = db.query_row(
-        "SELECT r.status, r.work_status, s.provider_id
+        "SELECT r.status, r.work_status, s.provider_id, r.seeker_id
          FROM service_requests r
          JOIN services s ON s.id = r.service_id
          WHERE r.id = ?1",
         rusqlite::params![request_id],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?)),
     );
 
     match current {
-        Ok((status, current_ws, provider_id)) => {
-            if provider_id != user_id {
+        Ok((status, current_ws, provider_id, seeker_id)) => {
+            let is_provider = user_id == provider_id;
+            let is_seeker = user_id == seeker_id;
+
+            if !is_provider && !is_seeker {
                 return HttpResponse::Forbidden()
-                    .json(serde_json::json!({"error": "Only the provider can update work status"}));
+                    .json(serde_json::json!({"error": "You are not part of this request"}));
             }
             if status != "accepted" {
                 return HttpResponse::BadRequest()
                     .json(serde_json::json!({"error": "Request must be accepted to update work status"}));
             }
 
+            // Seeker can only accept offer: not_started -> in_progress
+            // Provider can do all transitions
             let is_valid = valid_transitions
                 .iter()
                 .any(|(from, to)| *from == current_ws && *to == body.work_status);
+
+            if !is_valid {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "error": format!("Cannot transition from '{}' to '{}'", current_ws, body.work_status)
+                }));
+            }
+
+            if is_seeker && !(current_ws == "not_started" && body.work_status == "in_progress") {
+                return HttpResponse::Forbidden()
+                    .json(serde_json::json!({"error": "Seekers can only accept the offer (move to in progress)"}));
+            }
 
             if !is_valid {
                 return HttpResponse::BadRequest().json(serde_json::json!({
@@ -388,6 +407,7 @@ pub async fn update_work_status(
 #[derive(Debug, Deserialize)]
 pub struct UpdateStatusBody {
     pub status: String,
+    pub reason: Option<String>,
 }
 
 pub async fn update_request_status(
@@ -411,42 +431,68 @@ pub async fn update_request_status(
 
     let db = state.db.lock().unwrap();
 
-    // Verify the user is the provider of the service this request is for
     let authorized = db.query_row(
-        "SELECT s.provider_id, r.seeker_id
+        "SELECT s.provider_id, r.seeker_id, r.status
          FROM service_requests r
          JOIN services s ON s.id = r.service_id
          WHERE r.id = ?1",
         rusqlite::params![request_id],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
     );
 
     match authorized {
-        Ok((provider_id, seeker_id)) => {
+        Ok((provider_id, seeker_id, current_status)) => {
             let is_provider = provider_id == user_id;
             let is_seeker = seeker_id == user_id;
 
-            // Provider can accept/decline/complete; seeker can cancel
-            if body.status == "cancelled" && !is_seeker {
+            if !is_provider && !is_seeker {
                 return HttpResponse::Forbidden()
-                    .json(serde_json::json!({"error": "Only the requester can cancel"}));
+                    .json(serde_json::json!({"error": "You are not part of this request"}));
             }
-            if body.status != "cancelled" && !is_provider {
-                return HttpResponse::Forbidden()
-                    .json(serde_json::json!({"error": "Only the provider can update this status"}));
+
+            // Both can decline (with reason)
+            // Provider can also accept/complete
+            // Seeker can also cancel
+            match body.status.as_str() {
+                "declined" => {
+                    if current_status != "pending" && current_status != "accepted" {
+                        return HttpResponse::BadRequest()
+                            .json(serde_json::json!({"error": "Can only decline pending or accepted requests"}));
+                    }
+                }
+                "cancelled" => {
+                    if !is_seeker {
+                        return HttpResponse::Forbidden()
+                            .json(serde_json::json!({"error": "Only the requester can cancel"}));
+                    }
+                }
+                "accepted" | "completed" => {
+                    if !is_provider {
+                        return HttpResponse::Forbidden()
+                            .json(serde_json::json!({"error": "Only the provider can update this status"}));
+                    }
+                }
+                _ => {}
             }
+
+            let reason = body.reason.as_deref().unwrap_or("");
+            let declined_by = if body.status == "declined" || body.status == "cancelled" {
+                Some(if is_provider { "provider" } else { "seeker" })
+            } else {
+                None
+            };
+
+            db.execute(
+                "UPDATE service_requests SET status = ?1, decline_reason = ?2, declined_by = ?3, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?4",
+                rusqlite::params![body.status, reason, declined_by, request_id],
+            )
+            .unwrap();
         }
         Err(_) => {
             return HttpResponse::NotFound()
                 .json(serde_json::json!({"error": "Request not found"}));
         }
     }
-
-    db.execute(
-        "UPDATE service_requests SET status = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?2",
-        rusqlite::params![body.status, request_id],
-    )
-    .unwrap();
 
     HttpResponse::Ok().json(serde_json::json!({"message": "Status updated"}))
 }

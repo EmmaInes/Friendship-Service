@@ -17,8 +17,7 @@ export default function home(app) {
         </nav>
       ` : `
         <nav class="hero-actions">
-          <a href="#/login" class="btn btn-primary">${t('nav.logIn')}</a>
-          <a href="#/register" class="btn btn-secondary">${t('nav.signUp')}</a>
+          <a href="#/login" class="btn btn-primary">${t('home.getStarted')}</a>
         </nav>
       `}
     </section>

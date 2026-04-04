@@ -58,6 +58,8 @@ const ERROR_MAP = {
   'Service not found': 'error.serviceNotFound',
   'Only the requester can cancel': 'error.onlyRequesterCancel',
   'Only the provider can update this status': 'error.onlyProviderUpdate',
+  'Google token verification failed': 'error.googleTokenFailed',
+  'This account uses Google Sign-In': 'error.googleAccountOnly',
 };
 
 export function translateError(backendError, fallbackKey) {

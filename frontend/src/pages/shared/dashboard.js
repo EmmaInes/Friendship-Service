@@ -24,10 +24,20 @@ function renderWorkBadge(ws) {
 function renderActions(r) {
   const parts = [];
 
-  // Work status advance button (provider only, when accepted)
+  // Seeker: Accept Offer button (when accepted + not_started)
+  if (r.my_role === 'seeker' && r.status === 'accepted' && r.work_status === 'not_started') {
+    parts.push(`<button class="btn btn-small btn-accept-offer" data-request-id="${r.id}">${t('dashboard.btnAcceptOffer')}</button>`);
+  }
+
+  // Provider: Work status advance button (when accepted)
   if (r.my_role === 'provider' && r.status === 'accepted' && WORK_STATUS_NEXT[r.work_status]) {
     const nextKey = WORK_STATUS_BTN_KEY[r.work_status];
     parts.push(`<button class="btn btn-small btn-advance" data-request-id="${r.id}" data-next="${WORK_STATUS_NEXT[r.work_status]}">${t(nextKey)}</button>`);
+  }
+
+  // Decline button (both parties, when pending or accepted but not done)
+  if ((r.status === 'pending' || r.status === 'accepted') && r.work_status !== 'done') {
+    parts.push(`<button class="btn btn-small btn-decline" data-request-id="${r.id}">${t('dashboard.btnDecline')}</button>`);
   }
 
   // Chat button (when accepted/pending)
@@ -108,6 +118,29 @@ export default async function dashboard(app) {
                       <td>${new Date(r.created_at).toLocaleDateString()}</td>
                       <td>${renderActions(r)}</td>
                     </tr>
+                    ${(r.status === 'declined' || r.status === 'cancelled') && r.decline_reason ? `
+                    <tr class="decline-info-row">
+                      <td colspan="7">
+                        <div class="decline-info">
+                          <strong>${t('dashboard.declinedBy', { who: t('role.' + (r.declined_by || 'provider')) })}:</strong>
+                          ${r.decline_reason}
+                        </div>
+                      </td>
+                    </tr>` : ''}
+                    <tr class="decline-row" id="decline-row-${r.id}" style="display:none">
+                      <td colspan="7">
+                        <div class="review-form">
+                          <h4>${t('dashboard.declineReasonTitle')}</h4>
+                          <div class="review-form-inner">
+                            <label>${t('dashboard.declineReasonLabel')}
+                              <textarea id="decline-reason-${r.id}" rows="2" placeholder="${t('dashboard.declineReasonPlaceholder')}"></textarea>
+                            </label>
+                            <p class="error-msg" id="decline-error-${r.id}"></p>
+                            <button class="btn btn-primary btn-submit-decline" data-request-id="${r.id}">${t('dashboard.btnConfirmDecline')}</button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
                     <tr class="review-row" id="review-row-${r.id}" style="display:none">
                       <td colspan="7">
                         <div class="review-form" id="review-form-${r.id}">
@@ -134,6 +167,52 @@ export default async function dashboard(app) {
 
     // Wire up event handlers via delegation
     app.addEventListener('click', async (e) => {
+      // Accept offer (seeker)
+      const acceptBtn = e.target.closest('.btn-accept-offer');
+      if (acceptBtn) {
+        acceptBtn.disabled = true;
+        try {
+          await api.updateWorkStatus(acceptBtn.dataset.requestId, 'in_progress');
+          navigate('/dashboard');
+        } catch (err) {
+          acceptBtn.disabled = false;
+          alert(translateError(err.error, 'common.loading'));
+        }
+        return;
+      }
+
+      // Toggle decline form
+      const declineBtn = e.target.closest('.btn-decline');
+      if (declineBtn) {
+        const row = document.getElementById(`decline-row-${declineBtn.dataset.requestId}`);
+        row.style.display = row.style.display === 'none' ? '' : 'none';
+        return;
+      }
+
+      // Submit decline
+      const submitDeclineBtn = e.target.closest('.btn-submit-decline');
+      if (submitDeclineBtn) {
+        const rid = submitDeclineBtn.dataset.requestId;
+        const reason = document.getElementById(`decline-reason-${rid}`).value.trim();
+        const errorEl = document.getElementById(`decline-error-${rid}`);
+        errorEl.textContent = '';
+
+        if (!reason) {
+          errorEl.textContent = t('dashboard.declineReasonRequired');
+          return;
+        }
+
+        submitDeclineBtn.disabled = true;
+        try {
+          await api.updateRequestStatus(rid, 'declined', reason);
+          navigate('/dashboard');
+        } catch (err) {
+          submitDeclineBtn.disabled = false;
+          errorEl.textContent = translateError(err.error, 'common.loading');
+        }
+        return;
+      }
+
       // Advance work status
       const advanceBtn = e.target.closest('.btn-advance');
       if (advanceBtn) {
