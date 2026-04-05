@@ -206,6 +206,7 @@
   "error.alreadyReviewed": "You have already submitted a review for this request",
 
   "workStatus.not_started": "Not Started",
+  "workStatus.agreed": "Agreed",
   "workStatus.in_progress": "In Progress",
   "workStatus.ongoing": "Ongoing",
   "workStatus.done": "Done",

@@ -206,6 +206,7 @@
   "error.alreadyReviewed": "Você já enviou uma avaliação para esta solicitação",
 
   "workStatus.not_started": "Não Iniciado",
+  "workStatus.agreed": "Acordado",
   "workStatus.in_progress": "Em Progresso",
   "workStatus.ongoing": "Em Andamento",
   "workStatus.done": "Concluído",

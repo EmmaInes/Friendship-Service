@@ -372,6 +372,7 @@ body {
 }
 
 .work-badge.not-started { background: #e5e7eb; color: #374151; }
+.work-badge.agreed { background: #ede9fe; color: #6d28d9; }
 .work-badge.in-progress { background: #dbeafe; color: #1d4ed8; }
 .work-badge.ongoing { background: #fef3c7; color: #92400e; }
 .work-badge.done { background: #d1fae5; color: #065f46; }

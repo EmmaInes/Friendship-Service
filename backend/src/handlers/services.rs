@@ -337,7 +337,8 @@ pub async fn update_work_status(
 
     let request_id = path.into_inner();
     let valid_transitions = [
-        ("not_started", "in_progress"),
+        ("not_started", "agreed"),
+        ("agreed", "in_progress"),
         ("in_progress", "ongoing"),
         ("ongoing", "done"),
     ];
@@ -380,9 +381,9 @@ pub async fn update_work_status(
                 }));
             }
 
-            if is_seeker && !(current_ws == "not_started" && body.work_status == "in_progress") {
+            if is_seeker && !(current_ws == "not_started" && body.work_status == "agreed") {
                 return HttpResponse::Forbidden()
-                    .json(serde_json::json!({"error": "Seekers can only accept the offer (move to in progress)"}));
+                    .json(serde_json::json!({"error": "Seekers can only accept the offer"}));
             }
 
             if !is_valid {
@@ -432,16 +433,16 @@ pub async fn update_request_status(
     let db = state.db.lock().unwrap();
 
     let authorized = db.query_row(
-        "SELECT s.provider_id, r.seeker_id, r.status
+        "SELECT s.provider_id, r.seeker_id, r.status, r.work_status
          FROM service_requests r
          JOIN services s ON s.id = r.service_id
          WHERE r.id = ?1",
         rusqlite::params![request_id],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?)),
     );
 
     match authorized {
-        Ok((provider_id, seeker_id, current_status)) => {
+        Ok((provider_id, seeker_id, current_status, work_status)) => {
             let is_provider = provider_id == user_id;
             let is_seeker = seeker_id == user_id;
 
@@ -458,6 +459,14 @@ pub async fn update_request_status(
                     if current_status != "pending" && current_status != "accepted" {
                         return HttpResponse::BadRequest()
                             .json(serde_json::json!({"error": "Can only decline pending or accepted requests"}));
+                    }
+                    // Once work is in_progress or beyond, no more declines
+                    if current_status == "accepted"
+                        && work_status != "not_started"
+                        && work_status != "agreed"
+                    {
+                        return HttpResponse::BadRequest()
+                            .json(serde_json::json!({"error": "Cannot decline once work is in progress"}));
                     }
                 }
                 "cancelled" => {

@@ -5,13 +5,13 @@ import { formatPrice } from '../../utils.js';
 import { renderStarInput, initStarInput } from '../../components/star-rating.js';
 
 const WORK_STATUS_NEXT = {
-  not_started: 'in_progress',
+  agreed: 'in_progress',
   in_progress: 'ongoing',
   ongoing: 'done',
 };
 
 const WORK_STATUS_BTN_KEY = {
-  not_started: 'dashboard.btnStart',
+  agreed: 'dashboard.btnStart',
   in_progress: 'dashboard.btnOngoing',
   ongoing: 'dashboard.btnDone',
 };
@@ -35,8 +35,8 @@ function renderActions(r) {
     parts.push(`<button class="btn btn-small btn-advance" data-request-id="${r.id}" data-next="${WORK_STATUS_NEXT[r.work_status]}">${t(nextKey)}</button>`);
   }
 
-  // Decline button (both parties, when pending or accepted but not done)
-  if ((r.status === 'pending' || r.status === 'accepted') && r.work_status !== 'done') {
+  // Decline button (both parties, only before work is in progress)
+  if (r.status === 'pending' || (r.status === 'accepted' && (r.work_status === 'not_started' || r.work_status === 'agreed'))) {
     parts.push(`<button class="btn btn-small btn-decline" data-request-id="${r.id}">${t('dashboard.btnDecline')}</button>`);
   }
 
@@ -172,7 +172,7 @@ export default async function dashboard(app) {
       if (acceptBtn) {
         acceptBtn.disabled = true;
         try {
-          await api.updateWorkStatus(acceptBtn.dataset.requestId, 'in_progress');
+          await api.updateWorkStatus(acceptBtn.dataset.requestId, 'agreed');
           navigate('/dashboard');
         } catch (err) {
           acceptBtn.disabled = false;

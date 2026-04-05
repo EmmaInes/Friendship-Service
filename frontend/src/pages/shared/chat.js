@@ -90,7 +90,7 @@ export default async function chat(app, requestId) {
     acceptBtn.addEventListener('click', async () => {
       acceptBtn.disabled = true;
       try {
-        await api.updateWorkStatus(requestId, 'in_progress');
+        await api.updateWorkStatus(requestId, 'agreed');
         navigate('/dashboard');
       } catch (err) {
         acceptBtn.disabled = false;
