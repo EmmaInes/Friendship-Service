@@ -73,9 +73,9 @@ pub async fn submit(
     };
 
     // Check work_status allows reviews
-    if work_status != "ongoing" && work_status != "done" {
+    if work_status != "in_progress" && work_status != "ongoing" && work_status != "done" {
         return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Reviews are only available for ongoing or completed work"
+            "error": "Reviews are only available once work is in progress"
         }));
     }
 

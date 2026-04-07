@@ -49,8 +49,8 @@ function renderActions(r) {
     parts.push(`<a href="#/chat/${r.id}" class="btn btn-small btn-chat">${t('dashboard.btnChat')}</a>`);
   }
 
-  // Review button (both, when ongoing/done and hasn't reviewed)
-  if ((r.work_status === 'ongoing' || r.work_status === 'done') && !r.has_reviewed) {
+  // Review button (both, when in_progress/ongoing/done and hasn't reviewed)
+  if ((r.work_status === 'in_progress' || r.work_status === 'ongoing' || r.work_status === 'done') && !r.has_reviewed) {
     parts.push(`<button class="btn btn-small btn-review" data-request-id="${r.id}">${t('dashboard.btnReview')}</button>`);
   } else if (r.has_reviewed) {
     parts.push(`<span class="reviewed-badge">${t('dashboard.alreadyReviewed')} ✓</span>`);
