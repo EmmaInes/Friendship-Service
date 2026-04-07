@@ -8,13 +8,50 @@ export default function login(app) {
     <section class="auth-page">
       <img src="/logo.svg" alt="Friendship &amp; Service" class="auth-logo" />
       <h2>${t('login.title')}</h2>
-      <p style="text-align:center;color:var(--color-text-muted);margin-bottom:var(--space-lg)">${t('login.googlePrompt')}</p>
+
+      <form class="auth-form" id="login-form">
+        <label>
+          ${t('login.email')}
+          <input type="email" id="login-email" required />
+        </label>
+        <label>
+          ${t('login.password')}
+          <input type="password" id="login-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary">${t('login.submit')}</button>
+      </form>
+
+      <p class="auth-link" style="text-align:right;margin-top:var(--space-xs)">
+        <a href="#/forgot-password">${t('login.forgotPassword')}</a>
+      </p>
+
+      <div class="auth-divider"><span>${t('auth.or')}</span></div>
+
       <div id="g_id_signin" class="google-btn-wrap"></div>
+
       <p class="error-msg" id="login-error" style="text-align:center;margin-top:var(--space-md)"></p>
+
+      <p class="auth-switch">${t('login.noAccount')} <a href="#/register">${t('login.signUpLink')}</a></p>
     </section>
   `;
 
   const errorEl = document.getElementById('login-error');
+  const form = document.getElementById('login-form');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.textContent = '';
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    try {
+      const res = await api.login({ email, password });
+      setAuth(res.token, res.user);
+      navigate('/');
+    } catch (err) {
+      errorEl.textContent = translateError(err.error, 'login.failed');
+    }
+  });
 
   async function handleCredentialResponse(response) {
     errorEl.textContent = '';
@@ -27,7 +64,6 @@ export default function login(app) {
     }
   }
 
-  // Wait for GSI library to load
   function initGSI() {
     if (typeof google === 'undefined' || !google.accounts) {
       setTimeout(initGSI, 200);

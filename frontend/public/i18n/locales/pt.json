@@ -36,6 +36,9 @@
   "register.hasAccount": "Já tem uma conta?",
   "register.loginLink": "Entre",
   "register.failed": "Falha no cadastro",
+  "register.confirmPassword": "Confirmar Senha",
+  "register.passwordHint": "Mínimo de 8 caracteres",
+  "register.passwordsMismatch": "As senhas não coincidem",
   "register.googlePrompt": "Crie sua conta com Google",
 
   "forgot.title": "Redefinir Senha",
@@ -257,6 +260,8 @@
   "chat.about": "Sobre: {serviceTitle}",
 
   "dashboard.btnChat": "Chat",
+
+  "auth.or": "ou",
 
   "lang.en": "English",
   "lang.es": "Español",

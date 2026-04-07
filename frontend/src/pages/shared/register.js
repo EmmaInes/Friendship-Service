@@ -8,14 +8,68 @@ export default function register(app) {
     <section class="auth-page">
       <img src="/logo.svg" alt="Friendship &amp; Service" class="auth-logo" />
       <h2>${t('register.title')}</h2>
-      <p style="text-align:center;color:var(--color-text-muted);margin-bottom:var(--space-lg)">${t('register.googlePrompt')}</p>
+
+      <form class="auth-form" id="register-form">
+        <label>
+          ${t('register.displayName')}
+          <input type="text" id="reg-display-name" required maxlength="100" />
+        </label>
+        <label>
+          ${t('register.username')}
+          <input type="text" id="reg-username" required minlength="3" maxlength="30" />
+        </label>
+        <label>
+          ${t('register.email')}
+          <input type="email" id="reg-email" required />
+        </label>
+        <label>
+          ${t('register.password')}
+          <input type="password" id="reg-password" required minlength="8" />
+          <small style="color:var(--color-text-muted)">${t('register.passwordHint')}</small>
+        </label>
+        <label>
+          ${t('register.confirmPassword')}
+          <input type="password" id="reg-confirm-password" required minlength="8" />
+        </label>
+        <button type="submit" class="btn btn-primary">${t('register.submit')}</button>
+      </form>
+
+      <div class="auth-divider"><span>${t('auth.or')}</span></div>
+
       <div id="g_id_signup" class="google-btn-wrap"></div>
+
       <p class="error-msg" id="register-error" style="text-align:center;margin-top:var(--space-md)"></p>
+
       <p class="auth-switch">${t('register.hasAccount')} <a href="#/login">${t('register.loginLink')}</a></p>
     </section>
   `;
 
   const errorEl = document.getElementById('register-error');
+  const form = document.getElementById('register-form');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.textContent = '';
+
+    const display_name = document.getElementById('reg-display-name').value.trim();
+    const username = document.getElementById('reg-username').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirmPassword = document.getElementById('reg-confirm-password').value;
+
+    if (password !== confirmPassword) {
+      errorEl.textContent = t('register.passwordsMismatch');
+      return;
+    }
+
+    try {
+      const res = await api.register({ email, username, password, display_name });
+      setAuth(res.token, res.user);
+      navigate('/');
+    } catch (err) {
+      errorEl.textContent = translateError(err.error, 'register.failed');
+    }
+  });
 
   async function handleCredentialResponse(response) {
     errorEl.textContent = '';
