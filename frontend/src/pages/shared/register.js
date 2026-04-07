@@ -24,12 +24,18 @@ export default function register(app) {
         </label>
         <label>
           ${t('register.password')}
-          <input type="password" id="reg-password" required minlength="8" />
+          <div class="password-wrap">
+            <input type="password" id="reg-password" required minlength="8" />
+            <button type="button" class="password-toggle" aria-label="${t('auth.showPassword')}">${t('auth.show')}</button>
+          </div>
           <small style="color:var(--color-text-muted)">${t('register.passwordHint')}</small>
         </label>
         <label>
           ${t('register.confirmPassword')}
-          <input type="password" id="reg-confirm-password" required minlength="8" />
+          <div class="password-wrap">
+            <input type="password" id="reg-confirm-password" required minlength="8" />
+            <button type="button" class="password-toggle" aria-label="${t('auth.showPassword')}">${t('auth.show')}</button>
+          </div>
         </label>
         <button type="submit" class="btn btn-primary">${t('register.submit')}</button>
       </form>
@@ -46,6 +52,15 @@ export default function register(app) {
 
   const errorEl = document.getElementById('register-error');
   const form = document.getElementById('register-form');
+
+  form.querySelectorAll('.password-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = btn.previousElementSibling;
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      btn.textContent = visible ? t('auth.show') : t('auth.hide');
+    });
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

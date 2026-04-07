@@ -217,6 +217,7 @@
   "dashboard.colWorkStatus": "Progresso",
   "dashboard.colActions": "Ações",
   "dashboard.colParty": "Com",
+  "dashboard.btnAccept": "Aceitar",
   "dashboard.btnAcceptOffer": "Aceitar Oferta",
   "dashboard.btnDecline": "Recusar",
   "dashboard.btnConfirmDecline": "Confirmar Recusa",
@@ -262,6 +263,9 @@
   "dashboard.btnChat": "Chat",
 
   "auth.or": "ou",
+  "auth.show": "\ud83d\ude48",
+  "auth.hide": "\ud83d\udc41\ufe0f",
+  "auth.showPassword": "Mostrar senha",
 
   "lang.en": "English",
   "lang.es": "Español",

@@ -21,11 +21,17 @@ export default function forgotPassword(app) {
         </label>
         <label>
           ${t('forgot.newPassword')}
-          <input type="password" id="forgot-new-password" required minlength="8" />
+          <div class="password-wrap">
+            <input type="password" id="forgot-new-password" required minlength="8" />
+            <button type="button" class="password-toggle" aria-label="${t('auth.showPassword')}">${t('auth.show')}</button>
+          </div>
         </label>
         <label>
           ${t('forgot.confirmPassword')}
-          <input type="password" id="forgot-confirm-password" required minlength="8" />
+          <div class="password-wrap">
+            <input type="password" id="forgot-confirm-password" required minlength="8" />
+            <button type="button" class="password-toggle" aria-label="${t('auth.showPassword')}">${t('auth.show')}</button>
+          </div>
         </label>
         <button type="submit" class="btn btn-primary">${t('forgot.submit')}</button>
       </form>
@@ -40,6 +46,15 @@ export default function forgotPassword(app) {
   const errorEl = document.getElementById('forgot-error');
   const successEl = document.getElementById('forgot-success');
   const form = document.getElementById('forgot-form');
+
+  form.querySelectorAll('.password-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = btn.previousElementSibling;
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      btn.textContent = visible ? t('auth.show') : t('auth.hide');
+    });
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

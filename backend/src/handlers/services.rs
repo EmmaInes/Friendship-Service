@@ -336,12 +336,7 @@ pub async fn update_work_status(
     };
 
     let request_id = path.into_inner();
-    let valid_transitions = [
-        ("not_started", "agreed"),
-        ("agreed", "in_progress"),
-        ("in_progress", "ongoing"),
-        ("ongoing", "done"),
-    ];
+    let status_order = ["not_started", "agreed", "in_progress", "ongoing", "done"];
 
     let db = state.db.lock().unwrap();
 
@@ -369,27 +364,28 @@ pub async fn update_work_status(
                     .json(serde_json::json!({"error": "Request must be accepted to update work status"}));
             }
 
-            // Seeker can only accept offer: not_started -> in_progress
-            // Provider can do all transitions
-            let is_valid = valid_transitions
-                .iter()
-                .any(|(from, to)| *from == current_ws && *to == body.work_status);
+            let current_idx = status_order.iter().position(|&s| s == current_ws);
+            let target_idx = status_order.iter().position(|&s| s == body.work_status);
 
-            if !is_valid {
+            let (current_idx, target_idx) = match (current_idx, target_idx) {
+                (Some(c), Some(t)) => (c, t),
+                _ => {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "error": format!("Invalid work status '{}'", body.work_status)
+                    }));
+                }
+            };
+
+            if target_idx <= current_idx {
                 return HttpResponse::BadRequest().json(serde_json::json!({
                     "error": format!("Cannot transition from '{}' to '{}'", current_ws, body.work_status)
                 }));
             }
 
+            // Seeker can only do: not_started -> agreed
             if is_seeker && !(current_ws == "not_started" && body.work_status == "agreed") {
                 return HttpResponse::Forbidden()
                     .json(serde_json::json!({"error": "Seekers can only accept the offer"}));
-            }
-
-            if !is_valid {
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": format!("Cannot transition from '{}' to '{}'", current_ws, body.work_status)
-                }));
             }
 
             db.execute(

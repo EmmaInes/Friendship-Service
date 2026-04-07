@@ -4,35 +4,39 @@ import { t, translateError } from '../../i18n/i18n.js';
 import { formatPrice } from '../../utils.js';
 import { renderStarInput, initStarInput } from '../../components/star-rating.js';
 
-const WORK_STATUS_NEXT = {
-  agreed: 'in_progress',
-  in_progress: 'ongoing',
-  ongoing: 'done',
-};
+const WORK_STATUSES = ['not_started', 'agreed', 'in_progress', 'ongoing', 'done'];
 
-const WORK_STATUS_BTN_KEY = {
-  agreed: 'dashboard.btnStart',
-  in_progress: 'dashboard.btnOngoing',
-  ongoing: 'dashboard.btnDone',
-};
+function renderWorkStatus(r) {
+  const ws = r.work_status;
+  const currentIdx = WORK_STATUSES.indexOf(ws);
+  const isProvider = r.my_role === 'provider';
+  const enabled = isProvider && r.status === 'accepted' && currentIdx >= 1; // enabled from 'agreed' onward
 
-function renderWorkBadge(ws) {
-  const css = ws.replace('_', '-');
-  return `<span class="work-badge ${css}">${t('workStatus.' + ws)}</span>`;
+  if (!enabled) {
+    const css = ws.replace('_', '-');
+    return `<span class="work-badge ${css}">${t('workStatus.' + ws)}</span>`;
+  }
+
+  const options = WORK_STATUSES.map((s, i) => {
+    const selected = s === ws ? ' selected' : '';
+    if (i < currentIdx) return `<option value="${s}" disabled>${t('workStatus.' + s)}</option>`;
+    return `<option value="${s}"${selected}>${t('workStatus.' + s)}</option>`;
+  }).join('');
+
+  return `<select class="work-status-select" data-request-id="${r.id}">${options}</select>`;
 }
 
 function renderActions(r) {
   const parts = [];
 
+  // Provider: Accept request button (when pending)
+  if (r.my_role === 'provider' && r.status === 'pending') {
+    parts.push(`<button class="btn btn-small btn-accept-request" data-request-id="${r.id}">${t('dashboard.btnAccept')}</button>`);
+  }
+
   // Seeker: Accept Offer button (when accepted + not_started)
   if (r.my_role === 'seeker' && r.status === 'accepted' && r.work_status === 'not_started') {
     parts.push(`<button class="btn btn-small btn-accept-offer" data-request-id="${r.id}">${t('dashboard.btnAcceptOffer')}</button>`);
-  }
-
-  // Provider: Work status advance button (when accepted)
-  if (r.my_role === 'provider' && r.status === 'accepted' && WORK_STATUS_NEXT[r.work_status]) {
-    const nextKey = WORK_STATUS_BTN_KEY[r.work_status];
-    parts.push(`<button class="btn btn-small btn-advance" data-request-id="${r.id}" data-next="${WORK_STATUS_NEXT[r.work_status]}">${t(nextKey)}</button>`);
   }
 
   // Decline button (both parties, only before work is in progress)
@@ -113,7 +117,7 @@ export default async function dashboard(app) {
                       <td>${r.service_title}</td>
                       <td>${r.my_role === 'seeker' ? r.provider_name : r.seeker_name}</td>
                       <td>${t('status.' + r.status)}</td>
-                      <td>${r.status === 'accepted' ? renderWorkBadge(r.work_status) : '-'}</td>
+                      <td>${r.status === 'accepted' ? renderWorkStatus(r) : '-'}</td>
                       <td>${r.message || '-'}</td>
                       <td>${new Date(r.created_at).toLocaleDateString()}</td>
                       <td>${renderActions(r)}</td>
@@ -181,6 +185,20 @@ export default async function dashboard(app) {
         return;
       }
 
+      // Accept request (provider)
+      const acceptReqBtn = e.target.closest('.btn-accept-request');
+      if (acceptReqBtn) {
+        acceptReqBtn.disabled = true;
+        try {
+          await api.updateRequestStatus(acceptReqBtn.dataset.requestId, 'accepted');
+          navigate('/dashboard');
+        } catch (err) {
+          acceptReqBtn.disabled = false;
+          alert(translateError(err.error, 'common.loading'));
+        }
+        return;
+      }
+
       // Toggle decline form
       const declineBtn = e.target.closest('.btn-decline');
       if (declineBtn) {
@@ -209,20 +227,6 @@ export default async function dashboard(app) {
         } catch (err) {
           submitDeclineBtn.disabled = false;
           errorEl.textContent = translateError(err.error, 'common.loading');
-        }
-        return;
-      }
-
-      // Advance work status
-      const advanceBtn = e.target.closest('.btn-advance');
-      if (advanceBtn) {
-        advanceBtn.disabled = true;
-        try {
-          await api.updateWorkStatus(advanceBtn.dataset.requestId, advanceBtn.dataset.next);
-          navigate('/dashboard'); // re-render
-        } catch (err) {
-          advanceBtn.disabled = false;
-          alert(translateError(err.error, 'common.loading'));
         }
         return;
       }
@@ -265,6 +269,25 @@ export default async function dashboard(app) {
           submitBtn.disabled = false;
           errorEl.textContent = translateError(err.error, 'review.failed');
         }
+      }
+    });
+
+    // Work status dropdown change handler
+    app.addEventListener('change', async (e) => {
+      const select = e.target.closest('.work-status-select');
+      if (!select) return;
+
+      const rid = select.dataset.requestId;
+      const previousValue = select.dataset.current || select.querySelector('option[selected]')?.value;
+      select.disabled = true;
+
+      try {
+        await api.updateWorkStatus(rid, select.value);
+        navigate('/dashboard');
+      } catch (err) {
+        select.value = previousValue;
+        select.disabled = false;
+        alert(translateError(err.error, 'common.loading'));
       }
     });
 

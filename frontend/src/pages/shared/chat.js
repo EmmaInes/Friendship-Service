@@ -2,6 +2,20 @@ import { api, isLoggedIn, getUser } from '../../api.js';
 import { navigate } from '../../router.js';
 import { t, translateError } from '../../i18n/i18n.js';
 
+const WORK_STATUS_NEXT = {
+  not_started: 'in_progress',
+  agreed: 'in_progress',
+  in_progress: 'ongoing',
+  ongoing: 'done',
+};
+
+const WORK_STATUS_BTN_KEY = {
+  not_started: 'dashboard.btnStart',
+  agreed: 'dashboard.btnStart',
+  in_progress: 'dashboard.btnOngoing',
+  ongoing: 'dashboard.btnDone',
+};
+
 export default async function chat(app, requestId) {
   if (!isLoggedIn()) { navigate('/login'); return; }
 
@@ -30,8 +44,14 @@ export default async function chat(app, requestId) {
       <div class="chat-header">
         <div class="chat-header-top">
           <a href="#/dashboard" class="chat-back">\u2190 ${t('nav.dashboard')}</a>
+          ${req.my_role === 'provider' && req.status === 'pending'
+            ? `<button id="chat-accept-request" class="btn btn-primary btn-small">${t('dashboard.btnAccept')}</button>`
+            : ''}
           ${req.my_role === 'seeker' && req.status === 'accepted' && req.work_status === 'not_started'
             ? `<button id="chat-accept-offer" class="btn btn-primary btn-small">${t('dashboard.btnAcceptOffer')}</button>`
+            : ''}
+          ${req.my_role === 'provider' && req.status === 'accepted' && WORK_STATUS_NEXT[req.work_status]
+            ? `<button id="chat-advance-work" class="btn btn-primary btn-small" data-next="${WORK_STATUS_NEXT[req.work_status]}">${t(WORK_STATUS_BTN_KEY[req.work_status])}</button>`
             : ''}
         </div>
         <h3>${t('chat.with', { name: otherName })}</h3>
@@ -84,7 +104,22 @@ export default async function chat(app, requestId) {
     return div.innerHTML;
   }
 
-  // Accept Offer button
+  // Accept Request button (provider accepts pending request)
+  const acceptReqBtn = document.getElementById('chat-accept-request');
+  if (acceptReqBtn) {
+    acceptReqBtn.addEventListener('click', async () => {
+      acceptReqBtn.disabled = true;
+      try {
+        await api.updateRequestStatus(requestId, 'accepted');
+        navigate('/dashboard');
+      } catch (err) {
+        acceptReqBtn.disabled = false;
+        acceptReqBtn.textContent = translateError(err.error, 'chat.loadFailed');
+      }
+    });
+  }
+
+  // Accept Offer button (seeker agrees to accepted request)
   const acceptBtn = document.getElementById('chat-accept-offer');
   if (acceptBtn) {
     acceptBtn.addEventListener('click', async () => {
@@ -95,6 +130,21 @@ export default async function chat(app, requestId) {
       } catch (err) {
         acceptBtn.disabled = false;
         acceptBtn.textContent = translateError(err.error, 'chat.loadFailed');
+      }
+    });
+  }
+
+  // Advance work status button (provider)
+  const advanceBtn = document.getElementById('chat-advance-work');
+  if (advanceBtn) {
+    advanceBtn.addEventListener('click', async () => {
+      advanceBtn.disabled = true;
+      try {
+        await api.updateWorkStatus(requestId, advanceBtn.dataset.next);
+        navigate(`/chat/${requestId}`);
+      } catch (err) {
+        advanceBtn.disabled = false;
+        advanceBtn.textContent = translateError(err.error, 'chat.loadFailed');
       }
     });
   }

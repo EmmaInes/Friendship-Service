@@ -16,7 +16,10 @@ export default function login(app) {
         </label>
         <label>
           ${t('login.password')}
-          <input type="password" id="login-password" required />
+          <div class="password-wrap">
+            <input type="password" id="login-password" required />
+            <button type="button" class="password-toggle" aria-label="${t('auth.showPassword')}">${t('auth.show')}</button>
+          </div>
         </label>
         <button type="submit" class="btn btn-primary">${t('login.submit')}</button>
       </form>
@@ -37,6 +40,15 @@ export default function login(app) {
 
   const errorEl = document.getElementById('login-error');
   const form = document.getElementById('login-form');
+
+  form.querySelectorAll('.password-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = btn.previousElementSibling;
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      btn.textContent = visible ? t('auth.show') : t('auth.hide');
+    });
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
