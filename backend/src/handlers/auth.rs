@@ -5,6 +5,7 @@ use validator::Validate;
 
 use crate::auth;
 use crate::AppState;
+use super::extract_user_id;
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct RegisterRequest {
@@ -37,20 +38,19 @@ pub async fn register(
 
     let password_hash = match auth::hash_password(&body.password) {
         Ok(h) => h,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to hash password"
-            }))
-        }
+        Err(_) => return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to hash password"
+        })),
     };
 
     let id = Uuid::new_v4().to_string();
-    let db = state.db.lock().unwrap();
 
-    let result = db.execute(
-        "INSERT INTO users (id, email, username, password_hash, display_name) VALUES (?1, ?2, ?3, ?4, ?5)",
-        rusqlite::params![id, body.email, body.username, password_hash, body.display_name],
-    );
+    let result = sqlx::query!(
+        "INSERT INTO users (id, email, username, password_hash, display_name) VALUES ($1, $2, $3, $4, $5)",
+        id, body.email, body.username, password_hash, body.display_name
+    )
+    .execute(&state.db)
+    .await;
 
     match result {
         Ok(_) => {
@@ -66,18 +66,16 @@ pub async fn register(
                 }
             }))
         }
+        Err(sqlx::Error::Database(e)) if e.constraint().is_some() => {
+            HttpResponse::Conflict().json(serde_json::json!({
+                "error": "Email or username already taken"
+            }))
+        }
         Err(e) => {
-            let msg = e.to_string();
-            if msg.contains("UNIQUE") {
-                HttpResponse::Conflict().json(serde_json::json!({
-                    "error": "Email or username already taken"
-                }))
-            } else {
-                tracing::error!("Registration failed: {}", msg);
-                HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": "Registration failed"
-                }))
-            }
+            tracing::error!("Registration failed: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Registration failed"
+            }))
         }
     }
 }
@@ -86,44 +84,32 @@ pub async fn login(
     state: web::Data<AppState>,
     body: web::Json<LoginRequest>,
 ) -> HttpResponse {
-    let db = state.db.lock().unwrap();
-
-    let result = db.query_row(
-        "SELECT id, password_hash, email, username, display_name, role FROM users WHERE email = ?1",
-        rusqlite::params![body.email],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, Option<String>>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-            ))
-        },
-    );
+    let result = sqlx::query!(
+        "SELECT id, password_hash, email, username, display_name, role FROM users WHERE email = $1",
+        body.email
+    )
+    .fetch_optional(&state.db)
+    .await;
 
     match result {
-        Ok((id, hash, email, username, display_name, role)) => {
-            let hash = match hash {
+        Ok(Some(row)) => {
+            let hash = match row.password_hash {
                 Some(h) => h,
-                None => {
-                    // Google-only user, cannot login with password
-                    return HttpResponse::Unauthorized().json(serde_json::json!({
-                        "error": "This account uses Google Sign-In"
-                    }));
-                }
+                None => return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": "This account uses Google Sign-In"
+                })),
             };
+
             if auth::verify_password(&body.password, &hash) {
-                let token = auth::create_token(&id, &state.jwt_secret).unwrap();
+                let token = auth::create_token(&row.id, &state.jwt_secret).unwrap();
                 HttpResponse::Ok().json(serde_json::json!({
                     "token": token,
                     "user": {
-                        "id": id,
-                        "email": email,
-                        "username": username,
-                        "display_name": display_name,
-                        "role": role
+                        "id": row.id,
+                        "email": row.email,
+                        "username": row.username,
+                        "display_name": row.display_name,
+                        "role": row.role
                     }
                 }))
             } else {
@@ -132,7 +118,7 @@ pub async fn login(
                 }))
             }
         }
-        Err(_) => HttpResponse::Unauthorized().json(serde_json::json!({
+        _ => HttpResponse::Unauthorized().json(serde_json::json!({
             "error": "Invalid credentials"
         })),
     }
@@ -159,42 +145,39 @@ pub async fn reset_password(
         }));
     }
 
-    let db = state.db.lock().unwrap();
+    let user = sqlx::query!(
+        "SELECT id FROM users WHERE email = $1 AND username = $2",
+        body.email, body.username
+    )
+    .fetch_optional(&state.db)
+    .await;
 
-    let user_id = db.query_row(
-        "SELECT id FROM users WHERE email = ?1 AND username = ?2",
-        rusqlite::params![body.email, body.username],
-        |row| row.get::<_, String>(0),
-    );
-
-    match user_id {
-        Ok(id) => {
+    match user {
+        Ok(Some(row)) => {
             let password_hash = match auth::hash_password(&body.new_password) {
                 Ok(h) => h,
-                Err(_) => {
-                    return HttpResponse::InternalServerError().json(serde_json::json!({
-                        "error": "Failed to hash password"
-                    }))
-                }
+                Err(_) => return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to hash password"
+                })),
             };
 
-            db.execute(
-                "UPDATE users SET password_hash = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?2",
-                rusqlite::params![password_hash, id],
+            sqlx::query!(
+                "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+                password_hash, row.id
             )
-            .unwrap();
+            .execute(&state.db)
+            .await
+            .ok();
 
             HttpResponse::Ok().json(serde_json::json!({
                 "message": "Password updated successfully"
             }))
         }
-        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
+        _ => HttpResponse::BadRequest().json(serde_json::json!({
             "error": "No account found with that email and username combination"
         })),
     }
 }
-
-// --- Google OAuth ---
 
 #[derive(Debug, Deserialize)]
 pub struct GoogleLoginRequest {
@@ -214,7 +197,6 @@ pub async fn google_login(
     state: web::Data<AppState>,
     body: web::Json<GoogleLoginRequest>,
 ) -> HttpResponse {
-    // Verify the Google ID token via Google's tokeninfo endpoint
     let resp = state
         .http_client
         .get("https://oauth2.googleapis.com/tokeninfo")
@@ -225,36 +207,27 @@ pub async fn google_login(
     let token_info: GoogleTokenInfo = match resp {
         Ok(r) if r.status().is_success() => match r.json().await {
             Ok(info) => info,
-            Err(_) => {
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "Google token verification failed"
-                }));
-            }
+            Err(_) => return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Google token verification failed"
+            })),
         },
-        _ => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Google token verification failed"
-            }));
-        }
+        _ => return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Google token verification failed"
+        })),
     };
 
-    // Validate token
-    let google_id = match &token_info.sub {
-        Some(sub) => sub.clone(),
-        None => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Google token verification failed"
-            }));
-        }
+    let google_id = match token_info.sub {
+        Some(s) => s,
+        None => return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Google token verification failed"
+        })),
     };
 
-    let email = match &token_info.email {
-        Some(e) => e.clone(),
-        None => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Google account has no email"
-            }));
-        }
+    let email = match token_info.email {
+        Some(e) => e,
+        None => return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Google account has no email"
+        })),
     };
 
     if token_info.email_verified.as_deref() != Some("true") {
@@ -269,97 +242,98 @@ pub async fn google_login(
         }));
     }
 
-    let display_name = token_info.name.unwrap_or_else(|| email.split('@').next().unwrap_or("User").to_string());
+    let display_name = token_info.name.unwrap_or_else(|| {
+        email.split('@').next().unwrap_or("User").to_string()
+    });
 
-    let db = state.db.lock().unwrap();
-
-    // 1. Try to find user by google_id
-    let by_google = db.query_row(
-        "SELECT id, email, username, display_name, role FROM users WHERE google_id = ?1",
-        rusqlite::params![google_id],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-            ))
-        },
-    );
-
-    if let Ok((id, email, username, display_name, role)) = by_google {
-        let token = auth::create_token(&id, &state.jwt_secret).unwrap();
+    // 1. Find by google_id
+    if let Ok(Some(row)) = sqlx::query!(
+        "SELECT id, email, username, display_name, role FROM users WHERE google_id = $1",
+        google_id
+    )
+    .fetch_optional(&state.db)
+    .await
+    {
+        let token = auth::create_token(&row.id, &state.jwt_secret).unwrap();
         return HttpResponse::Ok().json(serde_json::json!({
             "token": token,
-            "user": { "id": id, "email": email, "username": username, "display_name": display_name, "role": role }
+            "user": { "id": row.id, "email": row.email, "username": row.username,
+                       "display_name": row.display_name, "role": row.role }
         }));
     }
 
-    // 2. Try to find user by email (link existing account)
-    let by_email = db.query_row(
-        "SELECT id, email, username, display_name, role FROM users WHERE email = ?1",
-        rusqlite::params![email],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-            ))
-        },
-    );
-
-    if let Ok((id, email, username, display_name, role)) = by_email {
-        // Link Google account
-        db.execute(
-            "UPDATE users SET google_id = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?2",
-            rusqlite::params![google_id, id],
+    // 2. Find by email and link
+    if let Ok(Some(row)) = sqlx::query!(
+        "SELECT id, email, username, display_name, role FROM users WHERE email = $1",
+        email
+    )
+    .fetch_optional(&state.db)
+    .await
+    {
+        sqlx::query!(
+            "UPDATE users SET google_id = $1, updated_at = NOW() WHERE id = $2",
+            google_id, row.id
         )
+        .execute(&state.db)
+        .await
         .ok();
-        let token = auth::create_token(&id, &state.jwt_secret).unwrap();
+
+        let token = auth::create_token(&row.id, &state.jwt_secret).unwrap();
         return HttpResponse::Ok().json(serde_json::json!({
             "token": token,
-            "user": { "id": id, "email": email, "username": username, "display_name": display_name, "role": role }
+            "user": { "id": row.id, "email": row.email, "username": row.username,
+                       "display_name": row.display_name, "role": row.role }
         }));
     }
 
-    // 3. Create new user
+    // 3. Create new user — generate unique username
     let id = Uuid::new_v4().to_string();
-
-    // Generate username from email prefix, handle collisions
-    let base_username = email.split('@').next().unwrap_or("user")
-        .chars().filter(|c| c.is_alphanumeric() || *c == '_').collect::<String>()
+    let base_username = email
+        .split('@')
+        .next()
+        .unwrap_or("user")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect::<String>()
         .to_lowercase();
-    let base_username = if base_username.len() < 3 { format!("{}user", base_username) } else { base_username };
+    let base_username = if base_username.len() < 3 {
+        format!("{}user", base_username)
+    } else {
+        base_username
+    };
 
     let mut username = base_username.clone();
-    let mut attempt = 0;
+    let mut attempt = 0u32;
     loop {
-        let exists = db.query_row(
-            "SELECT 1 FROM users WHERE username = ?1",
-            rusqlite::params![username],
-            |_| Ok(()),
-        );
-        if exists.is_err() {
-            break; // username is available
+        let exists = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM users WHERE username = $1",
+            username
+        )
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(Some(0));
+
+        if exists == Some(0) {
+            break;
         }
         attempt += 1;
         username = format!("{}{}", base_username, attempt);
     }
 
-    let result = db.execute(
-        "INSERT INTO users (id, email, username, display_name, google_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-        rusqlite::params![id, email, username, display_name, google_id],
-    );
+    let result = sqlx::query!(
+        "INSERT INTO users (id, email, username, display_name, google_id) VALUES ($1, $2, $3, $4, $5)",
+        id, email, username, display_name, google_id
+    )
+    .execute(&state.db)
+    .await;
 
     match result {
         Ok(_) => {
             let token = auth::create_token(&id, &state.jwt_secret).unwrap();
             HttpResponse::Created().json(serde_json::json!({
                 "token": token,
-                "user": { "id": id, "email": email, "username": username, "display_name": display_name, "role": "both" }
+                "user": { "id": id, "email": email, "username": username,
+                           "display_name": display_name, "role": "both" }
             }))
         }
         Err(e) => {
@@ -372,50 +346,28 @@ pub async fn google_login(
 }
 
 pub async fn me(req: HttpRequest, state: web::Data<AppState>) -> HttpResponse {
-    let token = match req
-        .headers()
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-    {
-        Some(t) => t,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Missing or invalid Authorization header"
-            }))
-        }
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
+        Ok(id) => id,
+        Err(e) => return HttpResponse::Unauthorized().json(serde_json::json!({"error": e})),
     };
 
-    let claims = match auth::validate_token(token, &state.jwt_secret) {
-        Ok(c) => c,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Invalid or expired token"
-            }))
-        }
-    };
-
-    let db = state.db.lock().unwrap();
-    let result = db.query_row(
-        "SELECT id, email, username, display_name, bio, role, created_at FROM users WHERE id = ?1",
-        rusqlite::params![claims.sub],
-        |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "email": row.get::<_, String>(1)?,
-                "username": row.get::<_, String>(2)?,
-                "display_name": row.get::<_, String>(3)?,
-                "bio": row.get::<_, String>(4)?,
-                "role": row.get::<_, String>(5)?,
-                "created_at": row.get::<_, String>(6)?,
-            }))
-        },
-    );
+    let result = sqlx::query!(
+        "SELECT id, email, username, display_name, bio, role, created_at FROM users WHERE id = $1",
+        user_id
+    )
+    .fetch_optional(&state.db)
+    .await;
 
     match result {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(_) => HttpResponse::NotFound().json(serde_json::json!({
-            "error": "User not found"
+        Ok(Some(row)) => HttpResponse::Ok().json(serde_json::json!({
+            "id": row.id,
+            "email": row.email,
+            "username": row.username,
+            "display_name": row.display_name,
+            "bio": row.bio,
+            "role": row.role,
+            "created_at": row.created_at,
         })),
+        _ => HttpResponse::NotFound().json(serde_json::json!({"error": "User not found"})),
     }
 }

@@ -1,30 +1,22 @@
-use rusqlite::Connection;
-use std::path::Path;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 
-mod embedded_migrations {
-    use refinery::embed_migrations;
-    embed_migrations!("migrations");
-}
+pub async fn init(database_url: &str) -> PgPool {
+    let pool = PgPoolOptions::new()
+        .max_connections(20)
+        .min_connections(2)
+        .acquire_timeout(std::time::Duration::from_secs(5))
+        .connect(database_url)
+        .await
+        .expect("Failed to connect to PostgreSQL");
 
-pub fn init(db_path: &str) -> Connection {
-    let needs_create = !Path::new(db_path).exists();
-    let mut conn = Connection::open(db_path).expect("Failed to open database");
+    tracing::info!("Connected to PostgreSQL, running migrations...");
 
-    if needs_create {
-        tracing::info!("Creating new database at {}", db_path);
-    }
-
-    conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA foreign_keys = ON;
-         PRAGMA busy_timeout = 5000;",
-    )
-    .expect("Failed to set PRAGMAs");
-
-    embedded_migrations::migrations::runner()
-        .run(&mut conn)
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
         .expect("Failed to run migrations");
 
     tracing::info!("Database ready");
-    conn
+    pool
 }

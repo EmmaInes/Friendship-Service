@@ -2,55 +2,8 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::auth;
 use crate::AppState;
-
-fn extract_user_id(req: &HttpRequest, jwt_secret: &str) -> Result<String, HttpResponse> {
-    let token = req
-        .headers()
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .ok_or_else(|| {
-            HttpResponse::Unauthorized().json(serde_json::json!({"error": "Not authenticated"}))
-        })?;
-
-    auth::validate_token(token, jwt_secret)
-        .map(|c| c.sub)
-        .map_err(|_| {
-            HttpResponse::Unauthorized()
-                .json(serde_json::json!({"error": "Invalid or expired token"}))
-        })
-}
-
-/// Verify user is seeker or provider for this request. Returns (seeker_id, provider_id).
-fn verify_party(
-    db: &rusqlite::Connection,
-    request_id: &str,
-    user_id: &str,
-) -> Result<(String, String), HttpResponse> {
-    let result = db.query_row(
-        "SELECT r.seeker_id, s.provider_id
-         FROM service_requests r
-         JOIN services s ON s.id = r.service_id
-         WHERE r.id = ?1",
-        rusqlite::params![request_id],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-    );
-
-    match result {
-        Ok((seeker_id, provider_id)) => {
-            if user_id != seeker_id && user_id != provider_id {
-                Err(HttpResponse::Forbidden()
-                    .json(serde_json::json!({"error": "You are not part of this request"})))
-            } else {
-                Ok((seeker_id, provider_id))
-            }
-        }
-        Err(_) => Err(HttpResponse::NotFound()
-            .json(serde_json::json!({"error": "Request not found"}))),
-    }
-}
+use super::extract_user_id;
 
 #[derive(Debug, Deserialize)]
 pub struct GetMessagesQuery {
@@ -65,63 +18,82 @@ pub async fn get_messages(
 ) -> HttpResponse {
     let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
-        Err(resp) => return resp,
+        Err(e) => return HttpResponse::Unauthorized().json(serde_json::json!({"error": e})),
     };
 
     let request_id = path.into_inner();
-    let db = state.db.lock().unwrap();
 
-    if let Err(resp) = verify_party(&db, &request_id, &user_id) {
-        return resp;
+    // Verify user is a party to this request
+    let party = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM service_requests r
+         JOIN services s ON s.id = r.service_id
+         WHERE r.id = $1 AND (r.seeker_id = $2 OR s.provider_id = $2)",
+        request_id, user_id
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(Some(0));
+
+    if party == Some(0) {
+        return HttpResponse::Forbidden()
+            .json(serde_json::json!({"error": "You are not part of this request"}));
     }
 
-    // Mark messages from the other party as read
-    db.execute(
-        "UPDATE messages SET read_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-         WHERE request_id = ?1 AND sender_id != ?2 AND read_at IS NULL",
-        rusqlite::params![request_id, user_id],
+    // Mark messages from other party as read
+    sqlx::query!(
+        "UPDATE messages SET read_at = NOW()
+         WHERE request_id = $1 AND sender_id != $2 AND read_at IS NULL",
+        request_id, user_id
     )
+    .execute(&state.db)
+    .await
     .ok();
 
     // Fetch messages
-    let (sql, params): (&str, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(ref after) = query.after {
-        (
+    let messages = if let Some(ref after) = query.after {
+        sqlx::query!(
             "SELECT m.id, m.sender_id, m.body, m.created_at, u.display_name
              FROM messages m
              JOIN users u ON u.id = m.sender_id
-             WHERE m.request_id = ?1 AND m.created_at > ?2
+             WHERE m.request_id = $1 AND m.created_at > $2::timestamptz
              ORDER BY m.created_at ASC, m.id ASC",
-            vec![Box::new(request_id.clone()), Box::new(after.clone())],
+            request_id, after
         )
+        .fetch_all(&state.db)
+        .await
     } else {
-        (
+        sqlx::query!(
             "SELECT m.id, m.sender_id, m.body, m.created_at, u.display_name
              FROM messages m
              JOIN users u ON u.id = m.sender_id
-             WHERE m.request_id = ?1
+             WHERE m.request_id = $1
              ORDER BY m.created_at ASC, m.id ASC",
-            vec![Box::new(request_id.clone())],
+            request_id
         )
+        .fetch_all(&state.db)
+        .await
     };
 
-    let mut stmt = db.prepare(sql).unwrap();
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-
-    let messages: Vec<serde_json::Value> = stmt
-        .query_map(params_refs.as_slice(), |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "sender_id": row.get::<_, String>(1)?,
-                "body": row.get::<_, String>(2)?,
-                "created_at": row.get::<_, String>(3)?,
-                "sender_name": row.get::<_, String>(4)?,
-            }))
-        })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
-
-    HttpResponse::Ok().json(messages)
+    match messages {
+        Ok(rows) => {
+            let result: Vec<serde_json::Value> = rows
+                .into_iter()
+                .map(|r| serde_json::json!({
+                    "id": r.id,
+                    "sender_id": r.sender_id,
+                    "body": r.body,
+                    "created_at": r.created_at,
+                    "sender_name": r.display_name,
+                }))
+                .collect();
+            HttpResponse::Ok().json(result)
+        }
+        Err(e) => {
+            tracing::error!("Failed to fetch messages: {}", e);
+            HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": "Failed to fetch messages"}))
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -137,7 +109,7 @@ pub async fn send_message(
 ) -> HttpResponse {
     let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
-        Err(resp) => return resp,
+        Err(e) => return HttpResponse::Unauthorized().json(serde_json::json!({"error": e})),
     };
 
     let request_id = path.into_inner();
@@ -147,19 +119,30 @@ pub async fn send_message(
             .json(serde_json::json!({"error": "Message must be 1-2000 characters"}));
     }
 
-    let db = state.db.lock().unwrap();
+    // Verify party
+    let party = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM service_requests r
+         JOIN services s ON s.id = r.service_id
+         WHERE r.id = $1 AND (r.seeker_id = $2 OR s.provider_id = $2)",
+        request_id, user_id
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(Some(0));
 
-    if let Err(resp) = verify_party(&db, &request_id, &user_id) {
-        return resp;
+    if party == Some(0) {
+        return HttpResponse::Forbidden()
+            .json(serde_json::json!({"error": "You are not part of this request"}));
     }
 
     let id = Uuid::new_v4().to_string();
 
-    let result = db.execute(
-        "INSERT INTO messages (id, request_id, sender_id, body)
-         VALUES (?1, ?2, ?3, ?4)",
-        rusqlite::params![id, request_id, user_id, body.body],
-    );
+    let result = sqlx::query!(
+        "INSERT INTO messages (id, request_id, sender_id, body) VALUES ($1, $2, $3, $4)",
+        id, request_id, user_id, body.body
+    )
+    .execute(&state.db)
+    .await;
 
     match result {
         Ok(_) => HttpResponse::Created().json(serde_json::json!({
@@ -174,31 +157,25 @@ pub async fn send_message(
     }
 }
 
-pub async fn unread_count(
-    req: HttpRequest,
-    state: web::Data<AppState>,
-) -> HttpResponse {
+pub async fn unread_count(req: HttpRequest, state: web::Data<AppState>) -> HttpResponse {
     let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
-        Err(resp) => return resp,
+        Err(e) => return HttpResponse::Unauthorized().json(serde_json::json!({"error": e})),
     };
 
-    let db = state.db.lock().unwrap();
+    let count = sqlx::query_scalar!(
+        "SELECT COUNT(*)
+         FROM messages m
+         JOIN service_requests r ON r.id = m.request_id
+         JOIN services s ON s.id = r.service_id
+         WHERE m.read_at IS NULL
+           AND m.sender_id != $1
+           AND (r.seeker_id = $1 OR s.provider_id = $1)",
+        user_id
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(Some(0));
 
-    // Count unread messages where user is a party but NOT the sender
-    let count: i64 = db
-        .query_row(
-            "SELECT COUNT(*)
-             FROM messages m
-             JOIN service_requests r ON r.id = m.request_id
-             JOIN services s ON s.id = r.service_id
-             WHERE m.read_at IS NULL
-               AND m.sender_id != ?1
-               AND (r.seeker_id = ?1 OR s.provider_id = ?1)",
-            rusqlite::params![user_id],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
-    HttpResponse::Ok().json(serde_json::json!({"count": count}))
+    HttpResponse::Ok().json(serde_json::json!({"count": count.unwrap_or(0)}))
 }

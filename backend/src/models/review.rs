@@ -1,6 +1,7 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 #[allow(dead_code)]
 pub struct Review {
     pub id: String,
@@ -10,5 +11,5 @@ pub struct Review {
     pub reviewer_role: String,
     pub rating: i32,
     pub comment: String,
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
 }

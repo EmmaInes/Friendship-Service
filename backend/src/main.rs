@@ -1,6 +1,5 @@
 use actix_web::{web, App, HttpServer, HttpResponse, middleware::Logger};
-use rusqlite::Connection;
-use std::sync::Mutex;
+use sqlx::PgPool;
 use tracing_subscriber::EnvFilter;
 
 mod auth;
@@ -9,7 +8,7 @@ mod handlers;
 mod models;
 
 pub struct AppState {
-    pub db: Mutex<Connection>,
+    pub db: PgPool,
     pub jwt_secret: String,
     pub google_client_id: String,
     pub http_client: reqwest::Client,
@@ -44,11 +43,13 @@ async fn main() -> std::io::Result<()> {
     let google_client_id = std::env::var("FS_GOOGLE_CLIENT_ID")
         .unwrap_or_else(|_| "not-configured".to_string());
 
-    let db_path = std::env::var("FS_DB_PATH").unwrap_or_else(|_| "../data/app.db".to_string());
-    let conn = db::init(&db_path);
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+
+    let pool = db::init(&database_url).await;
 
     let state = web::Data::new(AppState {
-        db: Mutex::new(conn),
+        db: pool,
         jwt_secret,
         google_client_id,
         http_client: reqwest::Client::new(),
