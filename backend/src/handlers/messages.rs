@@ -49,30 +49,22 @@ pub async fn get_messages(
     .await
     .ok();
 
-    // Fetch messages
-    let messages = if let Some(ref after) = query.after {
-        sqlx::query!(
-            "SELECT m.id, m.sender_id, m.body, m.created_at, u.display_name
-             FROM messages m
-             JOIN users u ON u.id = m.sender_id
-             WHERE m.request_id = $1 AND m.created_at > $2::timestamptz
-             ORDER BY m.created_at ASC, m.id ASC",
-            request_id, after
-        )
-        .fetch_all(&state.db)
-        .await
-    } else {
-        sqlx::query!(
-            "SELECT m.id, m.sender_id, m.body, m.created_at, u.display_name
-             FROM messages m
-             JOIN users u ON u.id = m.sender_id
-             WHERE m.request_id = $1
-             ORDER BY m.created_at ASC, m.id ASC",
-            request_id
-        )
-        .fetch_all(&state.db)
-        .await
-    };
+    // Fetch messages — use a single query with optional timestamp filter
+    let after_dt: Option<chrono::DateTime<chrono::Utc>> = query.after
+        .as_deref()
+        .and_then(|s| s.parse().ok());
+
+    let messages = sqlx::query!(
+        "SELECT m.id, m.sender_id, m.body, m.created_at, u.display_name
+         FROM messages m
+         JOIN users u ON u.id = m.sender_id
+         WHERE m.request_id = $1
+           AND ($2::timestamptz IS NULL OR m.created_at > $2::timestamptz)
+         ORDER BY m.created_at ASC, m.id ASC",
+        request_id, after_dt
+    )
+    .fetch_all(&state.db)
+    .await;
 
     match messages {
         Ok(rows) => {
